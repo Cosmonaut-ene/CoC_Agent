@@ -1439,6 +1439,13 @@ function checkAndAdvanceAct(narration) {
   });
 
   const allShown = act.clues.every(c => act.cluesShown.includes(c));
+
+  // Final act complete → story ending
+  if (allShown && state.currentAct === state.outline.acts.length) {
+    return '__STORY_COMPLETE__';
+  }
+
+  // Advance to next act
   if (allShown && state.currentAct < state.outline.acts.length) {
     state.currentAct++;
     updateActIndicator();
@@ -1621,6 +1628,45 @@ function safeParseJSON(raw) {
 
   return JSON.parse(out);
 }
+// ── Story Ending ────────────────────────────────────────
+async function triggerStoryEnding() {
+  stopTimer();
+  state.isGameOver = true;
+  document.getElementById('input-area').style.opacity = '0.3';
+  document.getElementById('input-area').style.pointerEvents = 'none';
+
+  addSystemMessage('═══ 最终幕落下 ═══');
+  setTyping(true);
+
+  const endings = state.outline?.endings || [];
+  const endingHint = endings.length > 0
+    ? (state.sanity > 50 ? endings[endings.length - 1]
+      : state.sanity > 20 ? endings[Math.floor(endings.length / 2)]
+      : endings[0])
+    : '调查员带着满身伤痕离开了这个地方';
+
+  try {
+    const data = await fetchWithRetry({
+      model: MODEL,
+      max_tokens: 400,
+      system: '你是洛夫克拉夫特风格跑团的主持人。用第二人称"你"写作，约120字，有文学感。这是故事的终章，语气沉重、解脱或模糊皆可。直接输出叙事文字，不要JSON。',
+      messages: [
+        ...state.history.slice(-6),
+        { role: 'user', content: `【故事结束，请写最终结局叙述】结局方向：${endingHint}。调查员当前理智：${state.sanity}/${state.maxSanity}。` }
+      ]
+    });
+    const closingText = data.content[0].text.trim();
+    setTyping(false);
+    addNarratorMsg(closingText.replace(/\*(.*?)\*/g, '<em>$1</em>'), false);
+  } catch(e) {
+    setTyping(false);
+    addNarratorMsg(`${endingHint}。故事到这里，落下了帷幕。`, false);
+  }
+
+  addSystemMessage('═══ 游戏结束：调查员完成了调查 ═══');
+  setTimeout(() => generateEndReport('通关'), 1500);
+}
+
 async function generateEndReport(outcome) {
   if (!state.outline) return;
 
@@ -1659,7 +1705,7 @@ async function generateEndReport(outcome) {
   report.innerHTML = `
     <div class="report-header">
       <span>米斯卡托尼克大学 · 异常事件档案室</span>
-      <span class="report-stamp">${outcome === '崩溃' ? '案件悬置' : '已结案'}</span>
+      <span class="report-stamp">${outcome === '崩溃' ? '案件悬置' : outcome === '通关' ? '已结案' : '已结案'}</span>
     </div>
     <div class="report-field"><span class="report-field-label">档案编号</span><span class="report-field-value">${caseId}</span></div>
     <div class="report-field"><span class="report-field-label">调查员</span><span class="report-field-value">${state.outline.investigatorName}</span></div>
@@ -2158,6 +2204,16 @@ ${outlineCtx}
 
     // Script Agent monitors progress and may inject a nudge
     const scriptNote = checkAndAdvanceAct(parsed.narration);
+
+    // Story complete — trigger ending sequence
+    if (scriptNote === '__STORY_COMPLETE__') {
+      state.history.push({ role: 'user', content: playerInput });
+      state.history.push({ role: 'assistant', content: JSON.stringify(parsed) });
+      setTyping(false);
+      addNarratorMsg(parsed.narration.replace(/\*(.*?)\*/g, '<em>$1</em>'), parsed.isHorror);
+      setTimeout(() => triggerStoryEnding(), 1200);
+      return;
+    }
 
     // Update history
     state.history.push({ role: 'user', content: playerInput });
