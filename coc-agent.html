@@ -1,0 +1,2315 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>深渊的低语 — COC跑团</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Special+Elite&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
+
+  :root {
+    --parchment: #1a1410;
+    --parchment-mid: #221c16;
+    --parchment-light: #2e2519;
+    --ink: #c8b89a;
+    --ink-faint: #7a6a55;
+    --ink-dim: #4a3f30;
+    --blood: #8b1a1a;
+    --sanity-full: #4a7c5a;
+    --sanity-low: #8b4513;
+    --sanity-critical: #8b1a1a;
+    --glow: rgba(200, 150, 80, 0.15);
+    --flicker: rgba(200, 150, 80, 0.05);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--parchment);
+    color: var(--ink);
+    font-family: 'Crimson Text', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse at 50% 0%, rgba(180,120,40,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse at 20% 80%, rgba(100,40,40,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(40,60,100,0.04) 0%, transparent 40%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Grain overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.6;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 24px 20px;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    padding: 28px 0 20px;
+    border-bottom: 1px solid var(--ink-dim);
+    margin-bottom: 24px;
+    position: relative;
+  }
+
+  .header::before, .header::after {
+    content: '✦';
+    color: var(--ink-dim);
+    font-size: 14px;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .header::before { left: 0; }
+  .header::after { right: 0; }
+
+  .title {
+    font-family: 'Special Elite', monospace;
+    font-size: 28px;
+    letter-spacing: 0.12em;
+    color: var(--ink);
+    text-shadow: 0 0 40px rgba(200,150,80,0.3);
+    animation: flicker 8s infinite;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--ink-faint);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  @keyframes flicker {
+    0%, 95%, 100% { opacity: 1; }
+    96% { opacity: 0.85; }
+    97% { opacity: 1; }
+    98% { opacity: 0.9; }
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    padding: 12px 20px;
+    background: var(--parchment-mid);
+    border: 1px solid var(--ink-dim);
+    margin-bottom: 20px;
+    font-family: 'Special Elite', monospace;
+    font-size: 13px;
+  }
+
+  .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .stat-label {
+    color: var(--ink-faint);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .stat-value {
+    color: var(--ink);
+  }
+
+  .sanity-bar-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .sanity-track {
+    flex: 1;
+    height: 6px;
+    background: var(--ink-dim);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sanity-fill {
+    height: 100%;
+    background: var(--sanity-full);
+    transition: width 0.8s ease, background 0.8s ease;
+    position: relative;
+  }
+
+  .sanity-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    animation: shimmer 3s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  .sanity-num {
+    font-size: 12px;
+    min-width: 36px;
+    text-align: right;
+  }
+
+  /* Chat area */
+  .log {
+    height: 400px;
+    overflow-y: auto;
+    padding: 20px;
+    background: var(--parchment-mid);
+    border: 1px solid var(--ink-dim);
+    border-bottom: none;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scroll-behavior: smooth;
+  }
+
+  .log::-webkit-scrollbar { width: 4px; }
+  .log::-webkit-scrollbar-track { background: var(--parchment); }
+  .log::-webkit-scrollbar-thumb { background: var(--ink-dim); }
+
+  .msg {
+    animation: fadeUp 0.5s ease forwards;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-narrator {
+    color: var(--ink);
+    font-style: italic;
+    font-size: 17px;
+    line-height: 1.7;
+    padding-left: 14px;
+    border-left: 2px solid var(--ink-dim);
+  }
+
+  .msg-narrator.horror {
+    color: #b8956a;
+    border-left-color: var(--blood);
+    text-shadow: 0 0 20px rgba(139,26,26,0.3);
+  }
+
+  .msg-player {
+    font-size: 15px;
+    color: var(--ink-faint);
+    text-align: right;
+    font-family: 'Special Elite', monospace;
+    letter-spacing: 0.05em;
+  }
+
+  .msg-player::before {
+    content: '> ';
+    color: var(--ink-dim);
+  }
+
+  .msg-system {
+    font-size: 12px;
+    color: var(--ink-dim);
+    text-align: center;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-family: 'Special Elite', monospace;
+  }
+
+  .msg-sanity-drop {
+    background: rgba(139,26,26,0.1);
+    border: 1px solid rgba(139,26,26,0.3);
+    color: #c0685a;
+    padding: 8px 16px;
+    font-family: 'Special Elite', monospace;
+    font-size: 13px;
+    text-align: center;
+    letter-spacing: 0.1em;
+    animation: fadeUp 0.5s ease forwards, pulseRed 2s ease infinite;
+  }
+
+  @keyframes pulseRed {
+    0%, 100% { border-color: rgba(139,26,26,0.3); }
+    50% { border-color: rgba(139,26,26,0.7); }
+  }
+
+  /* Typing indicator */
+  .typing-indicator {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    padding: 4px 14px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .typing-indicator.active { opacity: 1; }
+  .typing-dot {
+    width: 5px; height: 5px;
+    background: var(--ink-dim);
+    border-radius: 50%;
+    animation: bounce 1.2s infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-6px); }
+  }
+
+  /* Input area */
+  .input-area {
+    background: var(--parchment-light);
+    border: 1px solid var(--ink-dim);
+    padding: 16px 20px;
+    position: relative;
+  }
+
+  .input-label {
+    font-size: 11px;
+    color: var(--ink-dim);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    font-family: 'Special Elite', monospace;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .mode-indicator {
+    padding: 2px 8px;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    border: 1px solid;
+    transition: all 0.5s;
+  }
+
+  .mode-sane {
+    color: var(--sanity-full);
+    border-color: var(--sanity-full);
+  }
+
+  .mode-fractured {
+    color: #c08040;
+    border-color: #c08040;
+    animation: modeFlicker 3s infinite;
+  }
+
+  .mode-lost {
+    color: var(--blood);
+    border-color: var(--blood);
+    animation: modeFlicker 1s infinite;
+  }
+
+  @keyframes modeFlicker {
+    0%, 90%, 100% { opacity: 1; }
+    95% { opacity: 0.4; }
+  }
+
+  /* Free text input */
+  .text-input-wrap {
+    display: flex;
+    gap: 10px;
+  }
+
+  textarea {
+    flex: 1;
+    background: var(--parchment);
+    border: 1px solid var(--ink-dim);
+    color: var(--ink);
+    font-family: 'Crimson Text', serif;
+    font-size: 16px;
+    padding: 10px 14px;
+    resize: none;
+    outline: none;
+    line-height: 1.5;
+    transition: border-color 0.3s;
+    min-height: 52px;
+    max-height: 120px;
+  }
+
+  textarea:focus { border-color: var(--ink-faint); }
+  textarea::placeholder { color: var(--ink-dim); font-style: italic; }
+
+  textarea.cracking {
+    animation: textCrack 0.5s ease;
+    border-color: rgba(139,26,26,0.5);
+  }
+
+  @keyframes textCrack {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-3px); }
+    40% { transform: translateX(3px); }
+    60% { transform: translateX(-2px); }
+    80% { transform: translateX(2px); }
+  }
+
+  .send-btn {
+    background: transparent;
+    border: 1px solid var(--ink-dim);
+    color: var(--ink-faint);
+    font-family: 'Special Elite', monospace;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    padding: 0 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .send-btn:hover {
+    border-color: var(--ink);
+    color: var(--ink);
+    background: var(--glow);
+  }
+
+  .send-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  /* Word cloud mode */
+  .word-cloud-mode {
+    display: none;
+  }
+
+  .cloud-prompt {
+    font-size: 13px;
+    color: #c08040;
+    font-style: italic;
+    margin-bottom: 14px;
+    line-height: 1.4;
+    animation: cloudPromptFlicker 4s infinite;
+  }
+
+  @keyframes cloudPromptFlicker {
+    0%, 85%, 100% { opacity: 1; }
+    90% { opacity: 0.6; }
+    92% { opacity: 1; }
+    95% { opacity: 0.7; }
+  }
+
+  .word-cloud {
+    display: block;
+    min-height: 140px;
+    height: 160px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(60,45,30,0.3);
+    background: rgba(18,13,10,0.4);
+  }
+
+  /* Timer bar */
+  .timer-bar-wrap {
+    height: 3px;
+    background: rgba(60,40,25,0.4);
+    margin-bottom: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  .timer-bar {
+    height: 100%;
+    width: 100%;
+    background: #6a4a28;
+    transform-origin: left;
+    transition: background 0.5s;
+  }
+  .timer-bar.urgent { background: #8b2010; }
+  .timer-label {
+    font-family: 'Special Elite', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    letter-spacing: 0.2em;
+    text-align: right;
+    margin-bottom: 4px;
+    transition: color 0.5s;
+  }
+  .timer-label.urgent { color: #8b4030; }
+
+  /* Drag-combine drop zone */
+  .combine-zone {
+    margin-top: 10px;
+    min-height: 44px;
+    border: 1px dashed rgba(80,55,35,0.5);
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+  .combine-zone.drag-over {
+    border-color: rgba(140,80,40,0.8);
+    background: rgba(40,25,15,0.6);
+  }
+  .combine-zone-label {
+    font-family: 'Special Elite', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    letter-spacing: 0.15em;
+    position: absolute;
+    top: 4px; right: 8px;
+  }
+  .combine-zone-hint {
+    color: var(--ink-dim);
+    font-style: italic;
+    font-size: 12px;
+  }
+  .combined-word {
+    font-family: 'Special Elite', monospace;
+    font-size: 14px;
+    color: #9a7050;
+    border: 1px solid rgba(100,65,35,0.5);
+    padding: 2px 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .combined-word:hover { color: var(--blood); border-color: var(--blood); }
+  /* Word fade-out animation */
+  @keyframes wordFadeOut {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.6) translateY(-10px); filter: blur(3px); }
+  }
+  .word-token.fading {
+    animation: wordFadeOut 1s ease forwards !important;
+    pointer-events: none;
+  }
+
+  .word-token {
+    font-family: 'Special Elite', monospace;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 3px 8px;
+    transition: text-shadow 0.2s, opacity 0.2s;
+    position: relative;
+    user-select: none;
+    letter-spacing: 0.06em;
+    line-height: 1.3;
+  }
+
+  /* Word sizes/weights based on "pull" */
+  .word-token.weight-1 { font-size: 12px; color: #3e3428; opacity: 0.65; }
+  .word-token.weight-2 { font-size: 14px; color: #5a4c38; }
+  .word-token.weight-3 { font-size: 17px; color: #7a6650; }
+  .word-token.weight-4 { font-size: 20px; color: #8c6438; text-shadow: 0 0 16px rgba(140,100,56,0.3); }
+  .word-token.weight-5 { font-size: 24px; color: #7a3020; text-shadow: 0 0 22px rgba(122,48,32,0.5), 0 0 48px rgba(122,48,32,0.2); }
+
+  .word-token:hover { text-shadow: 0 0 14px rgba(180,140,90,0.7); opacity: 1 !important; }
+  .word-token.weight-5:hover { text-shadow: 0 0 20px rgba(180,70,40,0.9), 0 0 50px rgba(180,70,40,0.35); }
+
+  .selected-words {
+    margin-top: 12px;
+    min-height: 32px;
+    font-family: 'Special Elite', monospace;
+    color: #a08060;
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .selected-word-chip {
+    border: 1px solid var(--ink-dim);
+    padding: 2px 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .selected-word-chip:hover {
+    border-color: var(--blood);
+    color: var(--blood);
+  }
+
+  .cloud-send-btn {
+    margin-top: 12px;
+    width: 100%;
+    background: transparent;
+    border: 1px solid rgba(139,26,26,0.4);
+    color: #a05040;
+    font-family: 'Special Elite', monospace;
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .cloud-send-btn:hover {
+    background: rgba(139,26,26,0.1);
+    border-color: rgba(139,26,26,0.7);
+    color: #c06050;
+  }
+
+  .cloud-send-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  /* Vignette overlay for low sanity */
+  .vignette {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    transition: opacity 1s ease;
+    opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(30,5,5,0.7) 100%);
+  }
+
+  /* Screen shake */
+  @keyframes screenShake {
+    0%, 100% { transform: translate(0,0) rotate(0deg); }
+    10% { transform: translate(-3px, 2px) rotate(-0.5deg); }
+    30% { transform: translate(3px, -2px) rotate(0.3deg); }
+    50% { transform: translate(-2px, 3px) rotate(-0.3deg); }
+    70% { transform: translate(2px, -1px) rotate(0.2deg); }
+    90% { transform: translate(-1px, 2px) rotate(-0.2deg); }
+  }
+
+  .shaking { animation: screenShake 0.6s ease; }
+
+  /* Distortion text for horror messages */
+  .glitch-text {
+    position: relative;
+    display: inline-block;
+  }
+
+  .glitch-text::before, .glitch-text::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    opacity: 0.6;
+  }
+
+  .glitch-text::before {
+    color: #c05030;
+    animation: glitch1 5s infinite;
+    clip-path: polygon(0 20%, 100% 20%, 100% 40%, 0 40%);
+  }
+
+  .glitch-text::after {
+    color: #304090;
+    animation: glitch2 5s infinite;
+    clip-path: polygon(0 60%, 100% 60%, 100% 80%, 0 80%);
+  }
+
+  @keyframes glitch1 {
+    0%, 90%, 100% { transform: translate(0); opacity: 0; }
+    92% { transform: translate(-3px, 1px); opacity: 0.6; }
+    94% { transform: translate(2px, -1px); opacity: 0.6; }
+    96% { transform: translate(0); opacity: 0; }
+  }
+
+  @keyframes glitch2 {
+    0%, 91%, 100% { transform: translate(0); opacity: 0; }
+    93% { transform: translate(3px, -1px); opacity: 0.6; }
+    95% { transform: translate(-2px, 1px); opacity: 0.6; }
+    97% { transform: translate(0); opacity: 0; }
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 16px 0 8px;
+    font-size: 11px;
+    color: var(--ink-dim);
+    letter-spacing: 0.2em;
+  }
+
+  /* Loading state */
+  .loading-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(26,20,16,0.8);
+    z-index: 10;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .loading-overlay.active { display: flex; }
+
+  /* Scrollbar for word cloud if needed */
+  .word-cloud::-webkit-scrollbar { width: 3px; }
+
+  /* End Report */
+  .end-report {
+    margin-top: 16px;
+    border: 1px solid var(--ink-dim);
+    background: var(--parchment-mid);
+    padding: 20px 24px;
+    animation: fadeUp 0.6s ease forwards;
+  }
+  .report-header {
+    font-family: 'Special Elite', monospace;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--ink-dim);
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .report-stamp {
+    color: var(--blood);
+    font-size: 12px;
+    letter-spacing: 0.15em;
+    border: 1px solid var(--blood);
+    padding: 1px 8px;
+    opacity: 0.85;
+  }
+  .report-field {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 5px;
+    font-family: 'Special Elite', monospace;
+    font-size: 12px;
+  }
+  .report-field-label { color: var(--ink-dim); min-width: 90px; letter-spacing: 0.08em; }
+  .report-field-value { color: var(--ink-faint); }
+  .report-divider { border: none; border-top: 1px solid var(--ink-dim); margin: 12px 0; opacity: 0.4; }
+  .report-narrative {
+    font-family: 'Crimson Text', serif;
+    font-size: 15px;
+    color: #8a7860;
+    line-height: 1.85;
+    font-style: italic;
+    margin-top: 10px;
+  }
+
+  /* ── API Key Screen ── */
+  #key-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--parchment);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+  }
+  .key-box {
+    width: 100%;
+    max-width: 480px;
+    margin-top: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .key-label {
+    font-family: 'Crimson Text', serif;
+    font-size: 18px;
+    font-style: italic;
+    color: #a08060;
+    padding-left: 12px;
+    border-left: 2px solid var(--ink-dim);
+    line-height: 1.5;
+  }
+  .key-sub {
+    font-size: 12px;
+    color: var(--ink-dim);
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+  }
+  .key-input-wrap {
+    display: flex;
+    gap: 8px;
+  }
+  .key-input-wrap input {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--ink-dim);
+    color: var(--ink-faint);
+    font-family: 'Special Elite', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    outline: none;
+    letter-spacing: 0.05em;
+    transition: border-color 0.2s;
+  }
+  .key-input-wrap input:focus { border-color: #6a5a45; }
+  .key-confirm-btn {
+    background: transparent;
+    border: 1px solid var(--ink-dim);
+    color: var(--ink-dim);
+    font-family: 'Special Elite', monospace;
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .key-confirm-btn:hover { border-color: #8a7560; color: #8a7560; }
+  .key-error {
+    font-size: 12px;
+    color: var(--blood);
+    min-height: 16px;
+    letter-spacing: 0.05em;
+  }
+  .key-link {
+    font-size: 12px;
+    color: var(--ink-dim);
+    text-decoration: none;
+    letter-spacing: 0.05em;
+    transition: color 0.2s;
+  }
+  .key-link:hover { color: #8a7560; }
+
+  /* ── Onboarding Screen ── */
+  #onboarding {
+    position: fixed;
+    inset: 0;
+    background: var(--parchment);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    overflow-y: auto;
+  }
+
+  .ob-title {
+    font-family: 'Special Elite', monospace;
+    font-size: 26px;
+    color: var(--ink);
+    letter-spacing: 0.15em;
+    text-align: center;
+    margin-bottom: 6px;
+    text-shadow: 0 0 40px rgba(200,150,80,0.25);
+  }
+
+  .ob-subtitle {
+    font-size: 13px;
+    color: var(--ink-dim);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .ob-question {
+    width: 100%;
+    max-width: 560px;
+    margin-bottom: 40px;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+
+  .ob-question.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .ob-question-text {
+    font-family: 'Crimson Text', serif;
+    font-size: 18px;
+    font-style: italic;
+    color: #a08060;
+    margin-bottom: 16px;
+    line-height: 1.5;
+    padding-left: 12px;
+    border-left: 2px solid var(--ink-dim);
+  }
+
+  .ob-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ob-option {
+    background: transparent;
+    border: 1px solid var(--ink-dim);
+    color: var(--ink-faint);
+    font-family: 'Crimson Text', serif;
+    font-size: 15px;
+    padding: 12px 18px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+    line-height: 1.4;
+    position: relative;
+  }
+
+  .ob-option::before {
+    content: '◦';
+    margin-right: 10px;
+    color: var(--ink-dim);
+    transition: color 0.2s;
+  }
+
+  .ob-option:hover {
+    border-color: #6a5a45;
+    color: var(--ink);
+    background: rgba(100,80,50,0.08);
+  }
+
+  .ob-option:hover::before { color: #8a7560; }
+
+  .ob-option.selected {
+    border-color: #7a6650;
+    color: var(--ink);
+    background: rgba(100,80,50,0.12);
+  }
+
+  .ob-option.selected::before { content: '◆'; color: #8a7560; }
+
+  .ob-option-custom {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px dashed var(--ink-dim);
+    padding: 8px 18px;
+    transition: border-color 0.2s;
+  }
+  .ob-option-custom::before {
+    content: '✎';
+    color: var(--ink-dim);
+    flex-shrink: 0;
+    transition: color 0.2s;
+  }
+  .ob-option-custom:focus-within {
+    border-color: #6a5a45;
+  }
+  .ob-option-custom:focus-within::before { color: #8a7560; }
+  .ob-custom-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: 'Crimson Text', serif;
+    font-size: 15px;
+    color: var(--ink-faint);
+    width: 100%;
+    font-style: italic;
+  }
+  .ob-custom-input::placeholder { color: var(--ink-dim); opacity: 0.7; }
+  .ob-custom-confirm {
+    background: transparent;
+    border: 1px solid var(--ink-dim);
+    color: var(--ink-dim);
+    font-family: 'Special Elite', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    padding: 3px 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    display: none;
+  }
+  .ob-custom-confirm.visible { display: block; }
+  .ob-custom-confirm:hover { border-color: #8a7560; color: #8a7560; }
+
+  /* Generating screen */
+  #generating-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .gen-text {
+    font-family: 'Special Elite', monospace;
+    font-size: 14px;
+    color: var(--ink-faint);
+    letter-spacing: 0.2em;
+    text-align: center;
+  }
+
+  .gen-dots span {
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--ink-dim);
+    border-radius: 50%;
+    margin: 0 3px;
+    animation: bounce 1.2s infinite;
+  }
+  .gen-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .gen-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  /* Act indicator */
+  .act-indicator {
+    font-family: 'Special Elite', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    letter-spacing: 0.2em;
+    text-align: center;
+    padding: 4px 0 8px;
+  }
+
+  /* Keeper intervention */
+  .msg-keeper-note {
+    font-size: 12px;
+    color: #5a7a5a;
+    font-family: 'Special Elite', monospace;
+    letter-spacing: 0.1em;
+    padding: 6px 14px;
+    border-left: 2px solid #3a5a3a;
+    font-style: italic;
+    opacity: 0.8;
+  }
+</style>
+</head>
+<body>
+
+<div class="vignette" id="vignette"></div>
+
+<!-- ── API Key Screen ── -->
+<div id="key-screen">
+  <div class="ob-title">深渊的低语</div>
+  <div class="ob-subtitle">克苏鲁神话 · 文字跑团</div>
+  <div class="key-box">
+    <div class="key-label">在踏入黑暗之前，你需要一把钥匙</div>
+    <div class="key-sub">输入一个或多个 Gemini API Key（每行一个），遇到限额时自动切换。Key 仅存于本次会话，不会上传至任何服务器。</div>
+    <div class="key-input-wrap">
+      <textarea id="api-key-input" placeholder="AIza...（每行一个 Key）" autocomplete="off" rows="3" style="resize:vertical;font-family:'Special Elite',monospace;font-size:13px;padding:10px 14px;background:transparent;border:1px solid var(--ink-dim);color:var(--ink-faint);outline:none;flex:1;letter-spacing:0.03em;transition:border-color 0.2s;" onkeydown="if(event.ctrlKey&&event.key==='Enter')confirmKey()"></textarea>
+      <button class="key-confirm-btn" onclick="confirmKey()">进入</button>
+    </div>
+    <div class="key-error" id="key-error"></div>
+    <div id="key-current" style="display:none;font-size:12px;color:var(--ink-dim);letter-spacing:0.05em;">
+      已保存的 Key：<span id="key-current-val"></span>
+      <button onclick="clearSavedKey()" style="background:transparent;border:none;color:var(--blood);cursor:pointer;font-size:12px;margin-left:8px;text-decoration:underline;">清除</button>
+    </div>
+    <a class="key-link" href="https://aistudio.google.com/app/apikey" target="_blank">→ 前往 Google AI Studio 免费获取 Key</a>
+  </div>
+</div>
+
+<!-- ── Onboarding Screen ── -->
+<div id="onboarding" style="display:none">
+  <div class="ob-title">深渊的低语</div>
+  <div class="ob-subtitle">克苏鲁神话 · 文字跑团</div>
+
+  <div class="ob-question" id="obq-0">
+    <div class="ob-question-text">透过迷雾，你看到了什么……</div>
+    <div class="ob-options">
+      <button class="ob-option" onclick="selectOption(0,0,this)">维多利亚时代的孤塔——煤烟与雾气中，一封未拆的遗嘱</button>
+      <button class="ob-option" onclick="selectOption(0,1,this)">烟雨朦胧的寺庙——香灰落在一本用血写就的经文上</button>
+      <button class="ob-option" onclick="selectOption(0,2,this)">深夜的港口城市——潮水退去后，沙滩上留下了不该存在的脚印</button>
+      <button class="ob-option" onclick="selectOption(0,3,this)">荒原上的精神病院——所有病人在同一个夜晚说出了同一句话</button>
+      <div class="ob-option-custom" id="obq-0-custom">
+        <input class="ob-custom-input" id="obq-0-input" placeholder="或者，你看到的是……" oninput="onCustomInput(0)" onkeydown="onCustomKey(event,0)">
+        <button class="ob-custom-confirm" id="obq-0-confirm" onclick="confirmCustom(0)">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ob-question" id="obq-1">
+    <div class="ob-question-text">你在镜子里看到了谁……</div>
+    <div class="ob-options">
+      <button class="ob-option" onclick="selectOption(1,0,this)">民俗学者——你研究的那些古老传说，开始在现实中一一应验</button>
+      <button class="ob-option" onclick="selectOption(1,1,this)">退役军医——你见过战场上最黑暗的事，却没想到它们更黑暗的源头</button>
+      <button class="ob-option" onclick="selectOption(1,2,this)">报社记者——你只是来追一条新闻，没想到新闻在追你</button>
+      <button class="ob-option" onclick="selectOption(1,3,this)">失忆者——你不知道自己是谁，但某些地方会让你的手开始颤抖</button>
+      <div class="ob-option-custom" id="obq-1-custom">
+        <input class="ob-custom-input" id="obq-1-input" placeholder="或者，你看到的是……" oninput="onCustomInput(1)" onkeydown="onCustomKey(event,1)">
+        <button class="ob-custom-confirm" id="obq-1-confirm" onclick="confirmCustom(1)">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ob-question" id="obq-2">
+    <div class="ob-question-text">有什么东西，是你无论如何都想守护的……</div>
+    <div class="ob-options">
+      <button class="ob-option" onclick="selectOption(2,0,this)">一个人——他/她的下落是你踏入这片黑暗的唯一理由</button>
+      <button class="ob-option" onclick="selectOption(2,1,this)">真相——你宁愿知道那个答案，哪怕它会毁掉你</button>
+      <button class="ob-option" onclick="selectOption(2,2,this)">理智——你清楚地知道自己正在失去什么，这让你更加恐惧</button>
+      <div class="ob-option-custom" id="obq-2-custom">
+        <input class="ob-custom-input" id="obq-2-input" placeholder="或者，你守护的是……" oninput="onCustomInput(2)" onkeydown="onCustomKey(event,2)">
+        <button class="ob-custom-confirm" id="obq-2-confirm" onclick="confirmCustom(2)">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generating state -->
+  <div id="generating-screen">
+    <div class="gen-text">命运的织线正在编织……</div>
+    <div class="gen-dots"><span></span><span></span><span></span></div>
+    <div class="gen-text" id="gen-status" style="font-size:12px;opacity:0.5;"></div>
+  </div>
+</div>
+
+<div class="container" id="game-container" style="display:none">
+  <div class="header">
+    <div class="title">深渊的低语</div>
+    <div class="subtitle">克苏鲁神话 · 文字跑团</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat-item">
+      <span class="stat-label">调查员</span>
+      <span class="stat-value" id="char-name">—</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">地点</span>
+      <span class="stat-value" id="setting-label">—</span>
+    </div>
+    <div class="sanity-bar-wrap">
+      <span class="stat-label">理智</span>
+      <div class="sanity-track">
+        <div class="sanity-fill" id="sanity-fill" style="width:100%"></div>
+      </div>
+      <span class="sanity-num" id="sanity-num">85/85</span>
+    </div>
+  </div>
+  <div class="act-indicator" id="act-indicator"></div>
+
+  <!-- Log -->
+  <div class="log" id="log">
+    <div class="typing-indicator" id="typing-indicator">
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+    </div>
+  </div>
+
+  <!-- Input area -->
+  <div class="input-area" id="input-area">
+    <div class="input-label">
+      <span>你的行动</span>
+      <span class="mode-indicator mode-sane" id="mode-indicator">神志清醒</span>
+    </div>
+
+    <!-- Free text mode -->
+    <div class="text-input-wrap" id="free-input-wrap">
+      <textarea id="text-input" placeholder="描述你的行动……（例如：推开那扇门，检查房间里的书架）" rows="2"></textarea>
+      <button class="send-btn" id="send-btn" onclick="submitFreeText()">发送</button>
+    </div>
+
+    <!-- Word cloud mode -->
+    <div class="word-cloud-mode" id="word-cloud-mode">
+      <div class="cloud-prompt" id="cloud-prompt">
+        你的思维开始碎裂……某些念头在黑暗中浮现，你无法控制自己的意识流向何处。
+      </div>
+      <div class="timer-label" id="timer-label">思维窗口关闭前</div>
+      <div class="timer-bar-wrap">
+        <div class="timer-bar" id="timer-bar"></div>
+      </div>
+      <div class="word-cloud" id="word-cloud"></div>
+      <!-- Drag-combine zone -->
+      <div class="combine-zone" id="combine-zone">
+        <span class="combine-zone-label">拖拽组合</span>
+        <span class="combine-zone-hint" id="combine-hint">将词语拖入此处，或点击词语选择……</span>
+      </div>
+      <button class="cloud-send-btn" id="cloud-send-btn" onclick="submitWordCloud()" disabled>
+        ▸ 将这些想法说出口
+      </button>
+    </div>
+  </div>
+
+  <div class="footer">
+    理智值归零意味着你永远迷失在那个地方 · 每个选择都留下印记
+    <br><button onclick="changeApiKey()" style="margin-top:8px;background:transparent;border:none;color:var(--ink-dim);font-family:'Special Elite',monospace;font-size:11px;letter-spacing:0.15em;cursor:pointer;text-decoration:underline;opacity:0.6;">更换 API Key</button>
+  </div>
+</div>
+
+<script>
+const MODEL = "gemini-2.5-flash";
+
+function getApiUrl() {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${getApiKey()}`;
+}
+
+// Game state
+let state = {
+  sanity: 85,
+  maxSanity: 85,
+  history: [],
+  inputMode: 'free',
+  selectedWords: [],
+  isLoading: false,
+  isGameOver: false,
+  _pendingAIWords: null,
+  // Dual-agent state
+  outline: null,          // generated by ScriptAgent
+  currentAct: 1,
+  selections: [null, null, null]  // onboarding choices
+};
+
+// Timer state
+let timerInterval = null;
+let timerSeconds = 0;
+
+// Sanity thresholds
+// >60: free input
+// 30-60: fractured (word cloud)
+// <30: lost (word cloud, heavier distortion)
+
+// Fallback pools used while AI generates, or on API error
+const fallbackPools = {
+  fractured: ['检查','离开','等待','呼喊','躲藏','寻找','询问','返回','走近','触碰',
+              '黑暗','恐惧','诡异','颤抖','逃跑','遗忘','注视','不对劲','靠近它',
+              '那个东西','它看着我','门后','无法停止'],
+  lost: ['等','走','看','逃','躲','听','它','黑暗','眼睛','门','声音','血',
+         '忘记','怎么了','为什么','谁','Ph\'nglui','你已经看到了','Ia!','那颗眼','来吧']
+};
+
+// History of words the player has actually used — these reflux back into the cloud
+const playerWordHistory = [];
+
+// Corruption map: repeated exposure warps a word's appearance
+const corruptionMap = {}; // word -> corruption level 0-3
+
+// Track current drift intervals so we can clear on regenerate
+let driftIntervals = [];
+
+// Unicode corruption characters for text decay
+const corruptChars = ['̴','̵','̶','̷','̸','̡','̢','͜','͝','͞','̰','̳'];
+function corruptText(word, level) {
+  if (level === 0) return word;
+  let out = '';
+  for (let i = 0; i < word.length; i++) {
+    out += word[i];
+    if (Math.random() < level * 0.25) {
+      out += corruptChars[Math.floor(Math.random() * corruptChars.length)];
+    }
+  }
+  return out;
+}
+
+// 通用fetch重试包装
+// ── API Key ─────────────────────────────────────────────
+function confirmKey() {
+  const input = document.getElementById('api-key-input');
+  const err = document.getElementById('key-error');
+  const keys = input.value.split('\n').map(k => k.trim()).filter(k => k.startsWith('AIza') || k.startsWith('sk-ant-'));
+
+  if (keys.length === 0) {
+    err.textContent = 'Key 格式不正确，Gemini Key 应以 AIza 开头';
+    return;
+  }
+
+  sessionStorage.setItem('coc_api_keys', keys.join('\n'));
+  sessionStorage.setItem('coc_key_idx', '0');
+  err.textContent = '';
+
+  const ks = document.getElementById('key-screen');
+  ks.style.transition = 'opacity 0.6s';
+  ks.style.opacity = '0';
+  setTimeout(() => {
+    ks.style.display = 'none';
+    document.getElementById('onboarding').style.display = 'flex';
+  }, 600);
+}
+
+function changeApiKey() {
+  sessionStorage.removeItem('coc_api_keys');
+  sessionStorage.removeItem('coc_key_idx');
+  document.getElementById('api-key-input').value = '';
+  document.getElementById('key-error').textContent = '';
+  document.getElementById('game-container').style.display = 'none';
+  document.getElementById('onboarding').style.display = 'none';
+  const ks = document.getElementById('key-screen');
+  ks.style.display = 'flex';
+  ks.style.opacity = '1';
+}
+
+function clearSavedKey() {
+  sessionStorage.removeItem('coc_api_keys');
+  sessionStorage.removeItem('coc_key_idx');
+  document.getElementById('key-current').style.display = 'none';
+  document.getElementById('api-key-input').value = '';
+  document.getElementById('key-error').textContent = '已清除，请重新输入 Key';
+}
+
+// ── API Key Pool ────────────────────────────────────────
+function getApiKeys() {
+  const raw = sessionStorage.getItem('coc_api_keys') || '';
+  return raw.split('\n').map(k => k.trim()).filter(k => k.startsWith('AIza') || k.startsWith('sk-ant-'));
+}
+
+function getApiKey() {
+  const keys = getApiKeys();
+  const idx = parseInt(sessionStorage.getItem('coc_key_idx') || '0');
+  return keys[idx] || keys[0] || '';
+}
+
+function rotateApiKey() {
+  const keys = getApiKeys();
+  if (keys.length <= 1) return false;
+  const idx = parseInt(sessionStorage.getItem('coc_key_idx') || '0');
+  const next = (idx + 1) % keys.length;
+  sessionStorage.setItem('coc_key_idx', String(next));
+  console.log(`Key rotated to #${next + 1}/${keys.length}`);
+  return true;
+}
+
+// ── Onboarding ─────────────────────────────────────────
+const OB_LABELS = [
+  ['维多利亚时代的孤塔', '烟雨中的寺庙', '深夜的港口城市', '荒原上的精神病院'],
+  ['民俗学者', '退役军医', '报社记者', '失忆者'],
+  ['守护一个人', '追求真相', '守护理智']
+];
+
+function selectOption(questionIdx, optionIdx, btn) {
+  // Deselect preset buttons and clear custom
+  btn.closest('.ob-options').querySelectorAll('.ob-option').forEach(b => b.classList.remove('selected'));
+  const customInput = document.getElementById(`obq-${questionIdx}-input`);
+  const customZone  = document.getElementById(`obq-${questionIdx}-custom`);
+  if (customInput) { customInput.value = ''; }
+  if (customZone)  { customZone.style.borderStyle = 'dashed'; customZone.style.borderColor = ''; }
+
+  btn.classList.add('selected');
+  state.selections[questionIdx] = OB_LABELS[questionIdx][optionIdx];
+
+  const nextQ = document.getElementById(`obq-${questionIdx + 1}`);
+  if (nextQ) setTimeout(() => nextQ.classList.add('visible'), 300);
+
+  if (state.selections.every(s => s !== null)) {
+    setTimeout(() => startGeneration(), 600);
+  }
+}
+
+function onCustomInput(questionIdx) {
+  const input   = document.getElementById(`obq-${questionIdx}-input`);
+  const confirm = document.getElementById(`obq-${questionIdx}-confirm`);
+  const zone    = document.getElementById(`obq-${questionIdx}-custom`);
+  const hasText = input.value.trim().length > 0;
+  confirm.classList.toggle('visible', hasText);
+
+  // Deselect any preset when user starts typing
+  if (hasText) {
+    zone.closest('.ob-options').querySelectorAll('.ob-option').forEach(b => b.classList.remove('selected'));
+    state.selections[questionIdx] = null;
+  }
+}
+
+function onCustomKey(e, questionIdx) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    confirmCustom(questionIdx);
+  }
+}
+
+function confirmCustom(questionIdx) {
+  const input = document.getElementById(`obq-${questionIdx}-input`);
+  const text  = input.value.trim();
+  if (!text) return;
+
+  const zone = document.getElementById(`obq-${questionIdx}-custom`);
+  zone.style.borderStyle = 'solid';
+  zone.style.borderColor = '#7a6650';
+
+  state.selections[questionIdx] = text;
+
+  const nextQ = document.getElementById(`obq-${questionIdx + 1}`);
+  if (nextQ) setTimeout(() => nextQ.classList.add('visible'), 300);
+
+  if (state.selections.every(s => s !== null)) {
+    setTimeout(() => startGeneration(), 600);
+  }
+}
+
+async function startGeneration() {
+  document.querySelectorAll('.ob-question').forEach(q => {
+    q.style.transition = 'opacity 0.4s';
+    q.style.opacity = '0';
+    setTimeout(() => q.style.display = 'none', 400);
+  });
+  setTimeout(() => {
+    document.getElementById('generating-screen').style.display = 'flex';
+  }, 450);
+
+  const settingLabel      = state.selections[0];
+  const investigatorLabel = state.selections[1];
+  const motivationLabel   = state.selections[2];
+
+  document.getElementById('gen-status').textContent = '剧本编写者正在构建世界……';
+  const outline = await runScriptAgent(settingLabel, investigatorLabel, motivationLabel);
+  state.outline = outline;
+
+  document.getElementById('gen-status').textContent = '主持人正在准备开场……';
+  document.getElementById('char-name').textContent = outline.investigatorName;
+  document.getElementById('setting-label').textContent = settingLabel;
+  updateActIndicator();
+
+  const ob = document.getElementById('onboarding');
+  ob.style.transition = 'opacity 0.8s';
+  ob.style.opacity = '0';
+  setTimeout(() => {
+    ob.style.display = 'none';
+    const gc = document.getElementById('game-container');
+    gc.style.display = 'block';
+    gc.style.opacity = '0';
+    gc.style.transition = 'opacity 0.8s';
+    setTimeout(() => gc.style.opacity = '1', 50);
+    addSystemMessage('— 故事开始 —');
+    setTimeout(() => callAI('【游戏开始，请根据大纲给出开场叙述，不超过150字】'), 600);
+  }, 800);
+}
+
+// ── Script Agent ───────────────────────────────────────
+async function runScriptAgent(setting, investigator, motivation) {
+  const prompt = `你是克苏鲁跑团的剧本编写者。根据以下玩家选择创作三幕剧本大纲。
+
+玩家选择：
+- 故事背景：${setting}
+- 调查员身份：${investigator}  
+- 核心动机：${motivation}
+
+要求：
+- 调查员有符合身份的中文姓名
+- 三幕各有明确目标，每幕线索控制在1条以内（简短，不超过30字）
+- 一个洛夫克拉夫特风格的核心实体（简述，不超过30字）
+- 2个可能结局（每个不超过20字）
+- 一个隐藏秘密（不超过40字）
+- 所有字段尽量简短，严禁使用英文双引号写对话
+
+只返回JSON：
+{"investigatorName":"姓名","setting":"背景","acts":[{"id":1,"title":"幕名","goal":"目标","clues":["线索"],"cluesShown":[]},{"id":2,"title":"幕名","goal":"目标","clues":["线索"],"cluesShown":[]},{"id":3,"title":"幕名","goal":"目标","clues":["线索"],"cluesShown":[]}],"entity":"实体简述","secret":"核心秘密","endings":["结局1","结局2"]}`;
+
+  try {
+    const data = await fetchWithRetry({
+      model: MODEL, max_tokens: 1500,
+      system: '只返回纯JSON，不含任何说明文字或markdown代码块。所有字符串值内的对话必须用「」书名号，严禁使用英文双引号包裹对话内容。',
+      messages: [{ role: 'user', content: prompt }]
+    });
+    const raw = data.content[0].text;
+    return safeParseJSON(raw);
+  } catch(e) { console.warn('ScriptAgent failed:', e.message); }
+
+  // Fallback
+  const names = { '民俗学者':'林知远', '退役军医':'陈博文', '报社记者':'方晓雯', '失忆者':'无名者' };
+  return {
+    investigatorName: names[investigator] || investigator.slice(0, 4) || '调查员',
+    setting,
+    acts: [
+      {id:1,title:'异兆初现',goal:'发现异常',clues:['诡异符文','失踪者遗物'],cluesShown:[]},
+      {id:2,title:'真相渐显',goal:'揭开来源',clues:['古老记录','目击证词'],cluesShown:[]},
+      {id:3,title:'深渊凝视',goal:'面对真相',clues:['核心秘密'],cluesShown:[]}
+    ],
+    entity: '游荡于人类认知边缘的古老意识',
+    secret: '这一切从很久以前就已经开始了',
+    endings: ['精神崩溃', '侥幸逃脱', '以自我为代价封印真相']
+  };
+}
+
+// ── Script Agent: progress monitor ─────────────────────
+function checkAndAdvanceAct(narration) {
+  if (!state.outline) return null;
+  const act = state.outline.acts[state.currentAct - 1];
+  if (!act) return null;
+
+  // Mark clues as shown if narration mentions them
+  act.clues.forEach(clue => {
+    if (!act.cluesShown.includes(clue) && narration.includes(clue.slice(0, 2))) {
+      act.cluesShown.push(clue);
+    }
+  });
+
+  const allShown = act.clues.every(c => act.cluesShown.includes(c));
+  if (allShown && state.currentAct < state.outline.acts.length) {
+    state.currentAct++;
+    updateActIndicator();
+    const newAct = state.outline.acts[state.currentAct - 1];
+    return `【剧本编写者提示主持人：推进至第${state.currentAct}幕「${newAct.title}」，目标：${newAct.goal}】`;
+  }
+
+  // Nudge every 5 turns if clues remain
+  const turns = state.history.filter(m => m.role === 'assistant').length;
+  const unshown = act.clues.filter(c => !act.cluesShown.includes(c));
+  if (turns > 0 && turns % 5 === 0 && unshown.length > 0) {
+    return `【剧本编写者提示主持人：适时引导玩家发现「${unshown[0]}」】`;
+  }
+  return null;
+}
+
+function updateActIndicator() {
+  const el = document.getElementById('act-indicator');
+  if (!state.outline) { el.textContent = ''; return; }
+  const act = state.outline.acts[state.currentAct - 1];
+  if (act) el.textContent = `第${state.currentAct}幕  ·  ${act.title}`;
+}
+
+async function fetchWithRetry(body, maxRetries = 2) {
+  const geminiBody = {
+    systemInstruction: body.system ? { parts: [{ text: body.system }] } : undefined,
+    contents: (body.messages || []).map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    })),
+    generationConfig: {
+      maxOutputTokens: body.max_tokens || 1000,
+      temperature: 0.9,
+      thinkingConfig: { thinkingBudget: 0 }
+    }
+  };
+
+  const keyCount = Math.max(getApiKeys().length, 1);
+  const totalAttempts = maxRetries * keyCount;
+
+  for (let i = 0; i <= totalAttempts; i++) {
+    try {
+      const res = await fetch(getApiUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geminiBody)
+      });
+      if (res.status === 429) {
+        const rotated = rotateApiKey();
+        if (!rotated) await new Promise(r => setTimeout(r, 2000));
+        continue;
+      }
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+      }
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      return { content: [{ text }] };
+    } catch (e) {
+      if (i === totalAttempts) throw e;
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+}
+
+// Ask AI to generate contextual words based on recent story
+// Local word banks — no API call needed, saves quota
+const WORD_BANK = {
+  fractured: [
+    '推开','检查','询问','靠近','后退','寻找','拾起','观察','呼喊','逃跑',
+    '躲避','触碰','记录','翻阅','倾听','追踪','破坏','隐藏','祈祷','等待',
+    '黑暗','低语','裂缝','阴影','气味','回声','颤抖','凝视','冰冷','腐朽',
+    '封印','仪式','禁忌','古老','遗忘','深处','边缘','虚空','吞噬','扭曲'
+  ],
+  lost: [
+    '不','逃','黑','痛','水','眼','门','血','手','空',
+    'R\'lyeh','Cthulhu','Azathoth','深渊','虚无','碎裂','消失','沉默',
+    '旋转','吞噬','裂开','模糊','坠落','遗忘','冰冷','颤抖','尖叫','融化'
+  ]
+};
+
+function getLocalWords(mode, count) {
+  const bank = [...WORD_BANK[mode] || WORD_BANK.fractured];
+  // Shuffle
+  for (let i = bank.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [bank[i], bank[j]] = [bank[j], bank[i]];
+  }
+  return bank.slice(0, count);
+}
+
+// fetchAIWords now uses local bank to preserve API quota
+async function fetchAIWords(mode) {
+  const count = mode === 'lost' ? 12 : 20;
+  return getLocalWords(mode, count);
+}
+
+function getSanityMode(sanity) {
+  if (sanity > 60) return 'free';
+  if (sanity > 30) return 'fractured';
+  return 'lost';
+}
+
+function safeParseJSON(raw) {
+  // 1. Strip markdown fences
+  let text = raw.replace(/^```[\w]*\s*/m, '').replace(/\s*```\s*$/m, '').trim();
+
+  // 2. Extract first JSON object
+  const start = text.indexOf('{');
+  const end   = text.lastIndexOf('}');
+  if (start === -1 || end === -1) throw new Error('No JSON object found');
+  text = text.slice(start, end + 1);
+
+  // 3. Pre-escape Chinese/curly quotes so they don't confuse the tokenizer
+  text = text
+    .replace(/\u201c/g, '\\u201c').replace(/\u201d/g, '\\u201d')
+    .replace(/\u2018/g, '\\u2018').replace(/\u2019/g, '\\u2019')
+    .replace(/\u300c/g, '\\u300c').replace(/\u300d/g, '\\u300d');
+
+  // 4. Single-pass repair: walk char-by-char tracking real JSON structure.
+  //    When we are inside a JSON string value, any bare (unescaped) " must be
+  //    an accidental dialogue quote → escape it to \".
+  //    We know we're at a *structural* " when:
+  //      - we are NOT already inString, AND
+  //      - the previous non-whitespace char was : , [ { (i.e. a value-start position)
+  //    Otherwise treat it as a content quote and escape it.
+  let out = '';
+  let inStr = false;
+  // Track last structural char to decide if a " opens a new string value
+  let lastStructural = ''; // last char that was part of JSON structure
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+
+    if (inStr) {
+      if (ch === '\\') {
+        // Escape sequence: keep both chars and skip next
+        out += ch + (text[i + 1] || '');
+        i++;
+        continue;
+      }
+      if (ch === '"') {
+        // Could be closing quote or accidental bare quote inside value.
+        // Peek ahead: if next non-space is : , } ] then treat as closing quote.
+        let j = i + 1;
+        while (j < text.length && /\s/.test(text[j])) j++;
+        const next = text[j] || '';
+        if (/[:,\}\]]/.test(next)) {
+          // Closing quote
+          inStr = false;
+          lastStructural = '"';
+          out += '"';
+        } else {
+          // Bare quote inside string value → escape
+          out += '\\"';
+        }
+        continue;
+      }
+      // Inside string: escape bare newlines/tabs
+      if (ch === '\n') { out += '\\n'; continue; }
+      if (ch === '\r') { continue; }
+      if (ch === '\t') { out += '\\t'; continue; }
+      out += ch;
+    } else {
+      // Outside string
+      if (ch === '"') {
+        inStr = true;
+        lastStructural = '"';
+        out += '"';
+        continue;
+      }
+      if (!/\s/.test(ch)) lastStructural = ch;
+      out += ch;
+    }
+  }
+
+  // 5. Remove trailing commas
+  out = out.replace(/,(\s*[}\]])/g, '$1');
+
+  return JSON.parse(out);
+}
+async function generateEndReport(outcome) {
+  if (!state.outline) return;
+
+  const turnsPlayed = Math.floor(state.history.length / 2);
+  const cluesFound = state.outline.acts.flatMap(a => a.cluesShown);
+  const actsReached = state.currentAct;
+  const date = new Date();
+  const caseId = `MU-${date.getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}`;
+
+  // Build narrative summary via AI
+  const recentHistory = state.history.slice(-10)
+    .map(m => {
+      if (m.role === 'user') return `行动：${m.content}`;
+      try { return `叙事：${JSON.parse(m.content).narration}`; } catch { return ''; }
+    }).join('\n');
+
+  addSystemMessage('米斯卡托尼克大学异常事件档案室正在生成报告……');
+
+  let narrative = '案件记录遗失。';
+  try {
+    const data = await fetchWithRetry({
+      model: MODEL, max_tokens: 400,
+      system: '你是米斯卡托尼克大学异常事件档案室的书记员。用客观、克制、略带官僚气息的档案记录口吻写作，约120字，不用标题。',
+      messages: [{
+        role: 'user',
+        content: `根据以下调查记录，以官方档案的口吻写一段案件总结。调查员：${state.outline.investigatorName}。背景：${state.outline.setting}。结果：${outcome === '崩溃' ? '调查员精神崩溃，案件悬而未决' : '调查员成功脱身'}。已发现线索：${cluesFound.join('、') || '无'}。涉及实体：${state.outline.entity}。\n\n调查记录片段：\n${recentHistory}`
+      }]
+    });
+    narrative = data.content[0].text.trim();
+  } catch(e) { console.warn('Report generation failed:', e.message); }
+
+  // Render report into log
+  const log = document.getElementById('log');
+  const report = document.createElement('div');
+  report.className = 'end-report';
+  report.innerHTML = `
+    <div class="report-header">
+      <span>米斯卡托尼克大学 · 异常事件档案室</span>
+      <span class="report-stamp">${outcome === '崩溃' ? '案件悬置' : '已结案'}</span>
+    </div>
+    <div class="report-field"><span class="report-field-label">档案编号</span><span class="report-field-value">${caseId}</span></div>
+    <div class="report-field"><span class="report-field-label">调查员</span><span class="report-field-value">${state.outline.investigatorName}</span></div>
+    <div class="report-field"><span class="report-field-label">事发地点</span><span class="report-field-value">${state.outline.setting}</span></div>
+    <div class="report-field"><span class="report-field-label">推进幕次</span><span class="report-field-value">第${actsReached}幕 / 共${state.outline.acts.length}幕</span></div>
+    <div class="report-field"><span class="report-field-label">行动次数</span><span class="report-field-value">${turnsPlayed}次</span></div>
+    <div class="report-field"><span class="report-field-label">发现线索</span><span class="report-field-value">${cluesFound.length > 0 ? cluesFound.join('、') : '——'}</span></div>
+    <div class="report-field"><span class="report-field-label">最终理智</span><span class="report-field-value">${state.sanity} / ${state.maxSanity}</span></div>
+    <hr class="report-divider">
+    <div class="report-narrative">${narrative}</div>
+  `;
+  log.appendChild(report);
+  log.scrollTop = log.scrollHeight;
+}
+
+function updateSanityUI() {
+  const pct = (state.sanity / state.maxSanity) * 100;
+  const fill = document.getElementById('sanity-fill');
+  const num = document.getElementById('sanity-num');
+  const mode = getSanityMode(state.sanity);
+
+  fill.style.width = pct + '%';
+  num.textContent = `${state.sanity}/${state.maxSanity}`;
+
+  if (mode === 'free') {
+    fill.style.background = 'var(--sanity-full)';
+  } else if (mode === 'fractured') {
+    fill.style.background = 'var(--sanity-low)';
+  } else {
+    fill.style.background = 'var(--sanity-critical)';
+  }
+
+  // Vignette
+  const vignette = document.getElementById('vignette');
+  const vigOpacity = Math.max(0, (1 - state.sanity / state.maxSanity) * 0.8);
+  vignette.style.opacity = vigOpacity;
+
+  // Mode indicator
+  const indicator = document.getElementById('mode-indicator');
+  if (mode === 'free') {
+    indicator.textContent = '神志清醒';
+    indicator.className = 'mode-indicator mode-sane';
+  } else if (mode === 'fractured') {
+    indicator.textContent = '精神裂变';
+    indicator.className = 'mode-indicator mode-fractured';
+  } else {
+    indicator.textContent = '深渊凝视';
+    indicator.className = 'mode-indicator mode-lost';
+  }
+
+  // Switch input mode
+  switchInputMode(mode);
+}
+
+function switchInputMode(mode) {
+  const freeWrap = document.getElementById('free-input-wrap');
+  const cloudMode = document.getElementById('word-cloud-mode');
+
+  if (mode === 'free') {
+    freeWrap.style.display = 'flex';
+    cloudMode.style.display = 'none';
+    state.inputMode = 'free';
+  } else {
+    const modeChanged = state.inputMode !== mode;
+    const wasAlreadyCloud = state.inputMode !== 'free';
+
+    freeWrap.style.display = 'none';
+    cloudMode.style.display = 'block';
+
+    if (modeChanged) {
+      if (!wasAlreadyCloud) {
+        addSystemMessage('⚠ 你的思维开始碎裂，文字从脑海中滑落……');
+      }
+      state.inputMode = mode;
+      generateWordCloud(mode); // 只有模式真正改变时才重新生成
+    } else {
+      state.inputMode = mode; // 更新state但不重新生成
+    }
+  }
+}
+
+// Inject a unique shake keyframe for one word token
+let _shakeIdCounter = 0;
+function injectShakeKeyframe(tx, ty, rot, scale) {
+  const id = 'wshake_' + (_shakeIdCounter++);
+  const css = `@keyframes ${id} {
+    0%   { transform: translate(0,0) rotate(${rot}deg) scale(1); }
+    10%  { transform: translate(${tx*0.8}px,${-ty*0.6}px) rotate(${rot+rot*0.4}deg) scale(${scale}); }
+    25%  { transform: translate(${-tx}px,${ty*0.9}px) rotate(${rot-rot*0.6}deg) scale(1); }
+    40%  { transform: translate(${tx*0.5}px,${-ty*1.1}px) rotate(${rot*0.8}deg) scale(${scale}); }
+    55%  { transform: translate(${-tx*0.9}px,${ty*0.5}px) rotate(${-rot*0.5}deg) scale(1); }
+    70%  { transform: translate(${tx*0.3}px,${ty*0.8}px) rotate(${rot*0.3}deg) scale(${scale*0.98}); }
+    85%  { transform: translate(${-tx*0.2}px,${-ty*0.3}px) rotate(${-rot*0.2}deg) scale(1); }
+    100% { transform: translate(0,0) rotate(${rot}deg) scale(1); }
+  }`;
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+  return id;
+}
+
+async function generateWordCloud(mode) {
+  const cloud = document.getElementById('word-cloud');
+
+  driftIntervals.forEach(clearInterval);
+  driftIntervals = [];
+  state.selectedWords = [];
+  updateCombineZone();
+
+  const promptEl = document.getElementById('cloud-prompt');
+  promptEl.textContent = mode === 'lost'
+    ? '你的意识已经……不完整了。这些词语从黑暗中钻进你的脑子，你没有办法……'
+    : '你的思维开始碎裂……某些念头在黑暗中浮现，你无法控制自己的意识流向何处。';
+
+  // ── 只渲染一次，不做二次替换 ──
+  cloud.innerHTML = '';
+  let wordList = fallbackPools[mode].map(w => ({
+    w, weight: 1 + Math.floor(Math.random() * 4), source: 'fallback'
+  }));
+
+  // 使用上一轮后台获取的AI词（如果有）
+  if (state._pendingAIWords && state._pendingAIWords.length > 0) {
+    wordList = state._pendingAIWords.map(w => ({
+      w, weight: 2 + Math.floor(Math.random() * 3), source: 'ai'
+    }));
+    state._pendingAIWords = null;
+  }
+
+  // 混入玩家历史词
+  const historySlice = [...new Set(playerWordHistory)].slice(-6);
+  historySlice.forEach(w => {
+    wordList.push({ w, weight: 1 + Math.floor(Math.random() * 2), source: 'history', corruption: corruptionMap[w] || 0 });
+  });
+  const seen = new Set();
+  wordList = wordList.filter(item => { if (seen.has(item.w)) return false; seen.add(item.w); return true; });
+  wordList.sort(() => Math.random() - 0.5);
+  renderWords(cloud, wordList);
+  startTimer(mode);
+
+  // 后台获取AI词，存起来供下一轮使用
+  fetchAIWords(mode).then(aiWords => {
+    if (aiWords && aiWords.length > 0) state._pendingAIWords = aiWords;
+  }).catch(() => {});
+}
+
+function renderWords(cloud, words, mode) {
+  const sanityRatio = state.sanity / state.maxSanity;
+  const shakeIntensity = Math.max(0, 1 - sanityRatio);
+
+  // Grid-based placement to avoid overlap: divide cloud into cells
+  const cols = 5; const rows = 3;
+  const cells = [];
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      cells.push({ px: 2 + (c / cols) * 90, py: 5 + (r / rows) * 80 });
+  // Shuffle cells
+  cells.sort(() => Math.random() - 0.5);
+
+  words.slice(0, cells.length).forEach(({ w, weight, source, corruption = 0 }, idx) => {
+    const btn = document.createElement('button');
+    btn.className = `word-token weight-${weight}`;
+
+    const corruptLevel = source === 'history'
+      ? corruption
+      : (shakeIntensity > 0.65 && weight >= 4 ? Math.floor(shakeIntensity * 2) : 0);
+    btn.textContent = corruptLevel > 0 ? corruptText(w, corruptLevel) : w;
+    btn.dataset.word = w;
+
+    if (source === 'history') btn.style.color = `rgba(120,60,40,${0.5 + Math.random() * 0.3})`;
+
+    const cell = cells[idx];
+    // Add small jitter within the cell
+    const jx = (Math.random() - 0.5) * 8;
+    const jy = (Math.random() - 0.5) * 10;
+    btn.style.position = 'absolute';
+    btn.style.left = `calc(${cell.px}% + ${jx}px)`;
+    btn.style.top  = `calc(${cell.py}% + ${jy}px)`;
+    btn.style.opacity = '0';
+    const fadeDelay = 0.1 + idx * 0.04 + Math.random() * 0.2;
+    btn.style.animation = `fadeUp 0.5s ease ${fadeDelay}s forwards`;
+
+    btn.onclick = () => selectWord(w, btn);
+    setupDrag(btn, w);
+    cloud.appendChild(btn);
+
+    // Scheduled fade-out
+    const disappearAfter = mode === 'lost'
+      ? 6000 + Math.random() * 9000
+      : 12000 + Math.random() * 16000;
+    setTimeout(() => {
+      if (!btn.isConnected || state.selectedWords.includes(w)) return;
+      btn.classList.add('fading');
+      setTimeout(() => { if (btn.isConnected) btn.remove(); }, 1000);
+    }, disappearAfter);
+
+    // After fade-in: shake + drift
+    setTimeout(() => {
+      if (!btn.isConnected) return;
+      const wf = 0.3 + (weight - 1) * 0.175;
+      const tx = shakeIntensity * wf * (3 + Math.random() * 10);
+      const ty = shakeIntensity * wf * (2 + Math.random() * 8);
+      const rotAmp = shakeIntensity * wf * (1 + Math.random() * 5);
+      const scaleAmp = 1 + shakeIntensity * wf * 0.06;
+      const dur = (1.2 + Math.random() * 1.5) * (1 - shakeIntensity * 0.55);
+      const dly = Math.random() * dur;
+
+      let animStr = '';
+      if (shakeIntensity > 0.05) {
+        const kf = injectShakeKeyframe(tx, ty, rotAmp, scaleAmp);
+        animStr = `${kf} ${dur.toFixed(2)}s ease-in-out ${dly.toFixed(2)}s infinite`;
+      }
+
+      const dAmpX = (6 + Math.random() * 14) * shakeIntensity;
+      const dAmpY = (4 + Math.random() * 10) * shakeIntensity;
+      const dFx = 0.12 + Math.random() * 0.25;
+      const dFy = 0.10 + Math.random() * 0.20;
+      const phX = Math.random() * Math.PI * 2;
+      const phY = Math.random() * Math.PI * 2;
+      let t = 0;
+
+      if (shakeIntensity > 0.05) {
+        const iv = setInterval(() => {
+          if (!btn.isConnected) { clearInterval(iv); return; }
+          t += 0.05;
+          btn.style.marginLeft = (Math.sin(t * dFx * Math.PI * 2 + phX) * dAmpX) + 'px';
+          btn.style.marginTop  = (Math.cos(t * dFy * Math.PI * 2 + phY) * dAmpY) + 'px';
+        }, 50);
+        driftIntervals.push(iv);
+      }
+
+      btn.style.opacity = '1';
+      btn.style.animation = animStr || '';
+      if (!animStr) btn.style.transform = `rotate(${(Math.random()-0.5)*4}deg)`;
+    }, (fadeDelay + 0.55) * 1000);
+  });
+}
+
+function selectWord(word, btn) {
+  if (state.selectedWords.includes(word)) {
+    state.selectedWords = state.selectedWords.filter(w => w !== word);
+    btn.style.opacity = '1';
+    btn.style.outline = 'none';
+  } else {
+    if (state.selectedWords.length >= 5) return;
+    state.selectedWords.push(word);
+    btn.style.opacity = '0.3';
+    btn.style.outline = '1px solid rgba(160,60,40,0.4)';
+  }
+  updateCombineZone();
+}
+
+// ── Timer ──────────────────────────────────────────────
+let _timerGen = 0; // increment each time we start a new timer; stale intervals self-abort
+
+function startTimer(mode) {
+  _timerGen++;
+  const myGen = _timerGen;
+  clearInterval(timerInterval);
+
+  timerSeconds = mode === 'lost' ? 18 : 30;
+  const total = timerSeconds;
+
+  const bar = document.getElementById('timer-bar');
+  const label = document.getElementById('timer-label');
+  bar.style.transform = 'scaleX(1)';
+  bar.classList.remove('urgent');
+  label.classList.remove('urgent');
+  label.textContent = `思维窗口关闭前 ${timerSeconds}s`;
+
+  timerInterval = setInterval(() => {
+    if (_timerGen !== myGen) { clearInterval(timerInterval); return; } // stale, abort
+    timerSeconds--;
+    const ratio = Math.max(0, timerSeconds / total);
+    bar.style.transform = `scaleX(${ratio})`;
+    label.textContent = `思维窗口关闭前 ${timerSeconds}s`;
+
+    if (timerSeconds <= 8) {
+      bar.classList.add('urgent');
+      label.classList.add('urgent');
+    }
+
+    if (timerSeconds <= 0) {
+      clearInterval(timerInterval);
+      if (state.selectedWords.length > 0) {
+        addSystemMessage('时间耗尽——思维碎片自行涌出……');
+        submitWordCloud();
+      } else {
+        const tokens = document.querySelectorAll('.word-token:not(.fading)');
+        if (tokens.length > 0) {
+          const randomBtn = tokens[Math.floor(Math.random() * tokens.length)];
+          const word = randomBtn.dataset.word || randomBtn.textContent.replace(/[\u0300-\u036f\u0489]/g, '');
+          state.selectedWords = [word];
+          updateCombineZone();
+          addSystemMessage('思维失控——某个念头强行占据了你……');
+          submitWordCloud();
+        }
+      }
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  _timerGen++; // invalidate any running interval
+  clearInterval(timerInterval);
+  const bar = document.getElementById('timer-bar');
+  const label = document.getElementById('timer-label');
+  if (bar) { bar.style.transform = 'scaleX(1)'; bar.classList.remove('urgent'); }
+  if (label) { label.classList.remove('urgent'); label.textContent = '思维窗口关闭前'; }
+}
+
+// ── Combine Zone (click + drag) ─────────────────────────
+function updateCombineZone() {
+  const zone = document.getElementById('combine-zone');
+  const hint = document.getElementById('combine-hint');
+  const sendBtn = document.getElementById('cloud-send-btn');
+
+  // Remove existing word chips (keep label + hint)
+  zone.querySelectorAll('.combined-word').forEach(el => el.remove());
+
+  if (state.selectedWords.length === 0) {
+    hint.style.display = 'inline';
+    sendBtn.disabled = true;
+    return;
+  }
+
+  hint.style.display = 'none';
+  state.selectedWords.forEach((w, i) => {
+    const chip = document.createElement('span');
+    chip.className = 'combined-word';
+    chip.textContent = w;
+    chip.title = '点击移除';
+    chip.onclick = () => {
+      state.selectedWords.splice(i, 1);
+      // Re-enable that token in the cloud
+      document.querySelectorAll('.word-token').forEach(btn => {
+        if ((btn.dataset.word || btn.textContent) === w) {
+          btn.style.opacity = '1';
+          btn.style.outline = 'none';
+          btn.classList.remove('fading');
+        }
+      });
+      updateCombineZone();
+    };
+    zone.appendChild(chip);
+  });
+
+  sendBtn.disabled = false;
+}
+
+// Drag-drop setup on a word token
+function setupDrag(btn, word) {
+  btn.draggable = true;
+  btn.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', word);
+    e.dataTransfer.effectAllowed = 'move';
+    btn.style.opacity = '0.35';
+  });
+  btn.addEventListener('dragend', () => {
+    // If not dropped into zone, restore
+    if (!state.selectedWords.includes(word)) btn.style.opacity = '1';
+  });
+}
+
+// Setup the drop zone
+function setupDropZone() {
+  const zone = document.getElementById('combine-zone');
+  zone.addEventListener('dragover', e => {
+    e.preventDefault();
+    zone.classList.add('drag-over');
+  });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const word = e.dataTransfer.getData('text/plain');
+    if (!word || state.selectedWords.includes(word)) return;
+    if (state.selectedWords.length >= 5) return;
+    state.selectedWords.push(word);
+    updateCombineZone();
+    // Mark source token as used
+    document.querySelectorAll('.word-token').forEach(btn => {
+      if ((btn.dataset.word || btn.textContent) === word) {
+        btn.style.opacity = '0.3';
+      }
+    });
+  });
+}
+
+setupDropZone();
+
+// Add messages to log
+function addNarratorMsg(text, isHorror = false) {
+  const log = document.getElementById('log');
+  const indicator = document.getElementById('typing-indicator');
+  const div = document.createElement('div');
+  div.className = `msg msg-narrator${isHorror ? ' horror' : ''}`;
+  div.innerHTML = text;
+  log.insertBefore(div, indicator);
+  log.scrollTop = log.scrollHeight;
+}
+
+function addPlayerMsg(text) {
+  const log = document.getElementById('log');
+  const indicator = document.getElementById('typing-indicator');
+  const div = document.createElement('div');
+  div.className = 'msg msg-player';
+  div.textContent = text;
+  log.insertBefore(div, indicator);
+  log.scrollTop = log.scrollHeight;
+}
+
+function addSystemMessage(text) {
+  const log = document.getElementById('log');
+  const indicator = document.getElementById('typing-indicator');
+  const div = document.createElement('div');
+  div.className = 'msg msg-system';
+  div.textContent = text;
+  log.insertBefore(div, indicator);
+  log.scrollTop = log.scrollHeight;
+}
+
+function addSanityDrop(amount) {
+  const log = document.getElementById('log');
+  const indicator = document.getElementById('typing-indicator');
+  const div = document.createElement('div');
+  div.className = 'msg msg-sanity-drop';
+  div.textContent = `理智值 -${amount}`;
+  log.insertBefore(div, indicator);
+  log.scrollTop = log.scrollHeight;
+  // Screen shake
+  document.body.classList.remove('shaking');
+  void document.body.offsetWidth;
+  document.body.classList.add('shaking');
+  setTimeout(() => document.body.classList.remove('shaking'), 600);
+}
+
+function setTyping(active) {
+  document.getElementById('typing-indicator').className = `typing-indicator${active ? ' active' : ''}`;
+}
+
+// Main API call
+async function callAI(playerInput) {
+  if (state.isLoading) return;
+  state.isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('cloud-send-btn').disabled = true;
+  setTyping(true);
+
+  // Build outline context for Keeper
+  const outlineCtx = state.outline ? `
+【剧本大纲（仅主持人可见）】
+调查员：${state.outline.investigatorName}
+当前幕：第${state.currentAct}幕「${state.outline.acts[state.currentAct-1]?.title}」
+本幕目标：${state.outline.acts[state.currentAct-1]?.goal}
+待揭示线索：${state.outline.acts[state.currentAct-1]?.clues.filter(c=>!state.outline.acts[state.currentAct-1].cluesShown.includes(c)).join('、') || '（本幕线索已全部揭示）'}
+核心实体：${state.outline.entity}
+隐藏秘密：${state.outline.secret}
+背景：${state.outline.setting}` : '';
+
+  const systemPrompt = `你是洛夫克拉夫特风格跑团的主持人（Keeper），负责根据剧本大纲推进故事。
+${outlineCtx}
+
+当前调查员理智值：${state.sanity}/${state.maxSanity}
+
+主持人规则：
+1. 用第二人称"你"叙述，100-200字，有文学感
+2. 自然地将待揭示线索编织进叙事，不要强行提及
+3. 理智值低于40时，叙述更破碎、主观扭曲
+4. 玩家输入若是碎片词语（理智降低导致），合理诠释并推进剧情
+5. 若收到【剧本编写者提示】，按提示方向调整叙事
+6. narration中人物对话必须用「」书名号，严禁使用英文双引号"包裹对话
+
+只返回JSON：{"narration":"...","sanityLoss":数字(0-15),"isHorror":布尔}`;
+
+  const messages = [
+    ...state.history,
+    { role: 'user', content: playerInput }
+  ];
+
+  try {
+    const data = await fetchWithRetry({
+      model: MODEL,
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: messages
+    });
+
+    const text = data.content[0].text;
+
+    let parsed;
+    try {
+      parsed = safeParseJSON(text);
+    } catch {
+      parsed = { narration: text, sanityLoss: 1, isHorror: false };
+    }
+
+    // Script Agent monitors progress and may inject a nudge
+    const scriptNote = checkAndAdvanceAct(parsed.narration);
+
+    // Update history
+    state.history.push({ role: 'user', content: playerInput });
+    state.history.push({ role: 'assistant', content: JSON.stringify(parsed) });
+    if (state.history.length > 20) state.history = state.history.slice(-20);
+
+    const loss = Math.min(parsed.sanityLoss || 0, state.sanity);
+    const prevMode = getSanityMode(state.sanity);
+
+    setTyping(false);
+    addNarratorMsg(parsed.narration.replace(/\*(.*?)\*/g, '<em>$1</em>'), parsed.isHorror);
+
+    // Show script agent note if any
+    if (scriptNote) {
+      setTimeout(() => {
+        const log = document.getElementById('log');
+        const indicator = document.getElementById('typing-indicator');
+        const div = document.createElement('div');
+        div.className = 'msg msg-keeper-note';
+        div.textContent = scriptNote;
+        log.insertBefore(div, indicator);
+        log.scrollTop = log.scrollHeight;
+      }, 600);
+    }
+
+    if (loss > 0) {
+      setTimeout(() => {
+        state.sanity = Math.max(0, state.sanity - loss);
+        addSanityDrop(loss);
+        updateSanityUI();
+
+        const newMode = getSanityMode(state.sanity);
+        if (prevMode !== newMode && newMode !== 'free') {
+          setTimeout(() => {
+            addSystemMessage(newMode === 'fractured'
+              ? '你的理性开始动摇……某些思维碎片取代了你的自由意志。'
+              : '你的意识已跌入深渊的边缘……你几乎无法思考了。');
+          }, 800);
+        }
+
+        if (state.sanity <= 0) {
+          setTimeout(async () => {
+            stopTimer();
+            state.isGameOver = true;
+            addNarratorMsg(`你的意识在无尽的黑暗中崩溃。*${state.outline?.entity || '那个无名之物'}*凝视着你最后的神志碎片，将其收入永恒的饥渴之中。你再也没有走出那个地方……`, true);
+            addSystemMessage('═══ 游戏结束：调查员精神崩溃 ═══');
+            // Lock all inputs
+            document.getElementById('input-area').style.opacity = '0.3';
+            document.getElementById('input-area').style.pointerEvents = 'none';
+            // Generate report
+            setTimeout(() => generateEndReport('崩溃'), 1500);
+          }, 1200);
+        }
+      }, 400);
+    }
+
+  } catch (err) {
+    setTyping(false);
+    addSystemMessage('档案室的灯光突然熄灭……（连接暂时中断）');
+    console.error(err);
+  }
+
+  state.isLoading = false;
+  if (state.isGameOver) return;
+  document.getElementById('send-btn').disabled = false;
+  if (state.inputMode !== 'free') {
+    generateWordCloud(state.inputMode);
+    document.getElementById('cloud-send-btn').disabled = true;
+  }
+}
+
+function submitFreeText() {
+  const input = document.getElementById('text-input');
+  const text = input.value.trim();
+  if (!text || state.isLoading) return;
+
+  addPlayerMsg(text);
+  input.value = '';
+
+  // Crack effect if sanity is borderline
+  if (state.sanity < 40) {
+    input.classList.add('cracking');
+    setTimeout(() => input.classList.remove('cracking'), 500);
+  }
+
+  callAI(text);
+}
+
+function submitWordCloud() {
+  if (state.selectedWords.length === 0 || state.isLoading) return;
+  stopTimer();
+  const text = state.selectedWords.join('……');
+  addPlayerMsg(`[${text}]`);
+
+  // Record to history and increment corruption level
+  state.selectedWords.forEach(w => {
+    if (!playerWordHistory.includes(w)) playerWordHistory.push(w);
+    else {
+      // Each re-use deepens corruption, max level 3
+      corruptionMap[w] = Math.min(3, (corruptionMap[w] || 0) + 1);
+    }
+    // Cap history to last 20 unique words
+    if (playerWordHistory.length > 20) playerWordHistory.shift();
+  });
+
+  state.selectedWords = [];
+  updateCombineZone();
+  callAI(`（玩家的思维碎片，他/她选择了这些词：${text}）`);
+}
+
+// Keyboard
+document.getElementById('text-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    submitFreeText();
+  }
+});
+
+// Auto-resize textarea
+document.getElementById('text-input').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+// Init
+const _existingKey = sessionStorage.getItem('coc_api_keys');
+if (_existingKey) {
+  const keys = _existingKey.split('\n').filter(Boolean);
+  const hint = document.getElementById('key-current');
+  const val  = document.getElementById('key-current-val');
+  if (hint && val) {
+    val.textContent = keys.length > 1 ? `${keys.length} 个 Key` : keys[0].slice(0, 8) + '…';
+    hint.style.display = 'block';
+  }
+  const continueBtn = document.createElement('button');
+  continueBtn.textContent = `继续使用已保存的 Key${keys.length > 1 ? `（${keys.length} 个）` : ''}`;
+  continueBtn.style.cssText = 'margin-top:4px;background:transparent;border:1px solid var(--ink-dim);color:var(--ink-dim);font-family:Special Elite,monospace;font-size:12px;letter-spacing:0.15em;padding:8px 16px;cursor:pointer;transition:all 0.2s;';
+  continueBtn.onmouseover = () => { continueBtn.style.borderColor='#8a7560'; continueBtn.style.color='#8a7560'; };
+  continueBtn.onmouseout  = () => { continueBtn.style.borderColor='var(--ink-dim)'; continueBtn.style.color='var(--ink-dim)'; };
+  continueBtn.onclick = () => {
+    const ks = document.getElementById('key-screen');
+    ks.style.transition = 'opacity 0.6s';
+    ks.style.opacity = '0';
+    setTimeout(() => {
+      ks.style.display = 'none';
+      document.getElementById('onboarding').style.display = 'flex';
+    }, 600);
+  };
+  document.querySelector('.key-box').appendChild(continueBtn);
+}
+document.getElementById('obq-0').classList.add('visible');
+updateSanityUI();
+</script>
+</body>
+</html>
