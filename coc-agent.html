@@ -1538,10 +1538,42 @@ function getLocalWords(mode, count) {
   return bank.slice(0, count);
 }
 
-// fetchAIWords now uses local bank to preserve API quota
 async function fetchAIWords(mode) {
+  const recentNarration = state.history
+    .filter(m => m.role === 'assistant')
+    .slice(-3)
+    .map(m => { try { return JSON.parse(m.content).narration; } catch { return ''; } })
+    .join(' ');
+
   const count = mode === 'lost' ? 12 : 20;
-  return getLocalWords(mode, count);
+  const prompt = mode === 'lost'
+    ? `根据以下克苏鲁故事片段，生成${count}个极度破碎、混乱的中文词语或短语（1-4字），反映一个精神崩溃者的思维残片。可混入少量英文克苏鲁词汇。只返回JSON数组，格式：["词1","词2"]。故事：${recentNarration || '黑暗与虚空'}`
+    : `根据以下克苏鲁故事片段，生成${count}个适合调查员行动的中文词语或短语（1-5字），混合正常行动词和诡异恐惧相关的词。只返回JSON数组，格式：["词1","词2"]。故事：${recentNarration || '陌生的调查现场'}`;
+
+  try {
+    const data = await fetchWithRetry({
+      model: MODEL,
+      max_tokens: 300,
+      system: '只返回纯JSON数组，不含任何说明文字或markdown。',
+      messages: [{ role: 'user', content: prompt }]
+    }, 1); // only 1 retry to stay lightweight
+
+    const raw = data.content?.[0]?.text || '';
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (!match) return null;
+
+    let arrText = match[0]
+      .replace(/[\u201c\u201d\u2018\u2019\u300c\u300d\u300e\u300f]/g, '"')
+      .replace(/,\s*\]/g, ']');
+    arrText = arrText.replace(/"((?:[^"\\]|\\.)*)"/g, (m, inner) =>
+      '"' + inner.replace(/\n/g, '\\n').replace(/\r/g, '') + '"'
+    );
+    const arr = JSON.parse(arrText);
+    if (Array.isArray(arr) && arr.length > 0) return arr;
+  } catch(e) {
+    console.warn('fetchAIWords failed, using local fallback:', e.message);
+  }
+  return getLocalWords(mode, count); // silent fallback
 }
 
 function getSanityMode(sanity) {
