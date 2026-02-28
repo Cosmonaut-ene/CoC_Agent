@@ -1001,9 +1001,9 @@
   <div class="ob-subtitle">克苏鲁神话 · 文字跑团</div>
   <div class="key-box">
     <div class="key-label">在踏入黑暗之前，你需要一把钥匙</div>
-    <div class="key-sub">输入一个或多个 Gemini API Key（每行一个），遇到限额时自动切换。Key 仅存于本次会话，不会上传至任何服务器。</div>
+    <div class="key-sub">输入一个或多个 OpenRouter API Key（每行一个），遇到限额时自动切换。Key 仅存于本次会话，不会上传至任何服务器。</div>
     <div class="key-input-wrap">
-      <textarea id="api-key-input" placeholder="AIza...（每行一个 Key）" autocomplete="off" rows="3" style="resize:vertical;font-family:'Special Elite',monospace;font-size:13px;padding:10px 14px;background:transparent;border:1px solid var(--ink-dim);color:var(--ink-faint);outline:none;flex:1;letter-spacing:0.03em;transition:border-color 0.2s;" onkeydown="if(event.ctrlKey&&event.key==='Enter')confirmKey()"></textarea>
+      <textarea id="api-key-input" placeholder="sk-or-...（每行一个 Key）" autocomplete="off" rows="3" style="resize:vertical;font-family:'Special Elite',monospace;font-size:13px;padding:10px 14px;background:transparent;border:1px solid var(--ink-dim);color:var(--ink-faint);outline:none;flex:1;letter-spacing:0.03em;transition:border-color 0.2s;" onkeydown="if(event.ctrlKey&&event.key==='Enter')confirmKey()"></textarea>
       <button class="key-confirm-btn" onclick="confirmKey()">进入</button>
     </div>
     <div class="key-error" id="key-error"></div>
@@ -1011,7 +1011,7 @@
       已保存的 Key：<span id="key-current-val"></span>
       <button onclick="clearSavedKey()" style="background:transparent;border:none;color:var(--blood);cursor:pointer;font-size:12px;margin-left:8px;text-decoration:underline;">清除</button>
     </div>
-    <a class="key-link" href="https://aistudio.google.com/app/apikey" target="_blank">→ 前往 Google AI Studio 免费获取 Key</a>
+    <a class="key-link" href="https://openrouter.ai/keys" target="_blank">→ 前往 OpenRouter 获取 Key</a>
   </div>
 </div>
 
@@ -1145,11 +1145,10 @@
 </div>
 
 <script>
-const MODEL = "gemini-2.5-flash";
+const MODEL = "arcee-ai/trinity-large-preview:free";
+const API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
-function getApiUrl() {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${getApiKey()}`;
-}
+function getApiUrl() { return API_URL; }
 
 // Game state
 let state = {
@@ -1213,10 +1212,10 @@ function corruptText(word, level) {
 function confirmKey() {
   const input = document.getElementById('api-key-input');
   const err = document.getElementById('key-error');
-  const keys = input.value.split('\n').map(k => k.trim()).filter(k => k.startsWith('AIza') || k.startsWith('sk-ant-'));
+  const keys = input.value.split('\n').map(k => k.trim()).filter(k => k.startsWith('sk-or-'));
 
   if (keys.length === 0) {
-    err.textContent = 'Key 格式不正确，Gemini Key 应以 AIza 开头';
+    err.textContent = 'Key 格式不正确，OpenRouter Key 应以 sk-or- 开头';
     return;
   }
 
@@ -1256,7 +1255,7 @@ function clearSavedKey() {
 // ── API Key Pool ────────────────────────────────────────
 function getApiKeys() {
   const raw = sessionStorage.getItem('coc_api_keys') || '';
-  return raw.split('\n').map(k => k.trim()).filter(k => k.startsWith('AIza') || k.startsWith('sk-ant-'));
+  return raw.split('\n').map(k => k.trim()).filter(k => k.startsWith('sk-or-'));
 }
 
 function getApiKey() {
@@ -1358,6 +1357,8 @@ async function startGeneration() {
   document.getElementById('gen-status').textContent = '剧本编写者正在构建世界……';
   const outline = await runScriptAgent(settingLabel, investigatorLabel, motivationLabel);
   state.outline = outline;
+  // Pre-generate clues for act 1 immediately
+  generateActClues(outline.acts[0]);
 
   document.getElementById('gen-status').textContent = '主持人正在准备开场……';
   document.getElementById('char-name').textContent = outline.investigatorName;
@@ -1381,83 +1382,126 @@ async function startGeneration() {
 
 // ── Script Agent ───────────────────────────────────────
 async function runScriptAgent(setting, investigator, motivation) {
-  const prompt = `你是克苏鲁跑团的剧本编写者。根据以下玩家选择创作三幕剧本大纲。
+  const prompt = `你是克苏鲁跑团剧本编写者。根据玩家选择生成极简剧本骨架。
 
-玩家选择：
-- 故事背景：${setting}
-- 调查员身份：${investigator}  
-- 核心动机：${motivation}
+玩家选择：背景=${setting}，身份=${investigator}，动机=${motivation}
 
-要求：
-- 调查员有符合身份的中文姓名
-- 三幕各有明确目标，每幕线索控制在1条以内（简短，不超过30字）
-- 一个洛夫克拉夫特风格的核心实体（简述，不超过30字）
-- 2个可能结局（每个不超过20字）
-- 一个隐藏秘密（不超过40字）
-- 所有字段尽量简短，严禁使用英文双引号写对话
+只返回JSON，所有字段尽量简短：
+{"investigatorName":"中文姓名","setting":"背景","entity":"实体（15字内）","secret":"核心秘密（20字内）","endings":{"escape":"脱身结局（15字内）","sacrifice":"牺牲结局（15字内）"},"acts":[{"title":"幕名","goal":"目标（10字内）"},{"title":"幕名","goal":"目标（10字内）"},{"title":"幕名","goal":"目标（10字内）"}]}`;
 
-只返回JSON：
-{"investigatorName":"姓名","setting":"背景","acts":[{"id":1,"title":"幕名","goal":"目标","clues":["线索"],"cluesShown":[]},{"id":2,"title":"幕名","goal":"目标","clues":["线索"],"cluesShown":[]},{"id":3,"title":"幕名","goal":"目标","clues":["线索"],"cluesShown":[]}],"entity":"实体简述","secret":"核心秘密","endings":["结局1","结局2"]}`;
+  const makeClues = (descs) => descs.map(desc => ({ desc, revealed: false }));
 
   try {
     const data = await fetchWithRetry({
-      model: MODEL, max_tokens: 1500,
-      system: '只返回纯JSON，不含任何说明文字或markdown代码块。所有字符串值内的对话必须用「」书名号，严禁使用英文双引号包裹对话内容。',
+      model: MODEL, max_tokens: 600,
+      system: '只返回纯JSON，不含markdown。',
       messages: [{ role: 'user', content: prompt }]
     });
     const raw = data.content[0].text;
-    return safeParseJSON(raw);
+    const parsed = safeParseJSON(raw);
+    if (!parsed.acts || !Array.isArray(parsed.acts)) throw new Error('missing acts');
+
+    // Each act starts with 3 placeholder clues — will be replaced when act begins
+    parsed.acts = parsed.acts.map((act, i) => ({
+      ...act,
+      id: i + 1,
+      clues: makeClues(['线索A', '线索B', '线索C']),
+      cluesGenerated: false
+    }));
+    if (Array.isArray(parsed.endings)) {
+      parsed.endings = { escape: parsed.endings[0] || '调查员脱身', sacrifice: parsed.endings[1] || '调查员牺牲' };
+    }
+    return parsed;
   } catch(e) { console.warn('ScriptAgent failed:', e.message); }
 
   // Fallback
   const names = { '民俗学者':'林知远', '退役军医':'陈博文', '报社记者':'方晓雯', '失忆者':'无名者' };
   return {
-    investigatorName: names[investigator] || investigator.slice(0, 4) || '调查员',
-    setting,
+    investigatorName: names[investigator] || '调查员',
+    setting, entity: '游荡于认知边缘的古老意识',
+    secret: '仪式发起者已成为实体的延伸',
+    endings: { escape: '破坏仪式，趁乱脱身', sacrifice: '以自身为祭，封印实体' },
     acts: [
-      {id:1,title:'异兆初现',goal:'发现异常',clues:['诡异符文','失踪者遗物'],cluesShown:[]},
-      {id:2,title:'真相渐显',goal:'揭开来源',clues:['古老记录','目击证词'],cluesShown:[]},
-      {id:3,title:'深渊凝视',goal:'面对真相',clues:['核心秘密'],cluesShown:[]}
-    ],
-    entity: '游荡于人类认知边缘的古老意识',
-    secret: '这一切从很久以前就已经开始了',
-    endings: ['精神崩溃', '侥幸逃脱', '以自我为代价封印真相']
+      { id:1, title:'异兆初现', goal:'发现异常', clues: makeClues(['附近出现失踪事件','当地人讳莫如深','夜间传来吟唱声']), cluesGenerated: true },
+      { id:2, title:'真相渐显', goal:'追查来源', clues: makeClues(['发现仪式场所','找到禁忌文献','目击实体证据']), cluesGenerated: true },
+      { id:3, title:'深渊凝视', goal:'面对抉择', clues: makeClues(['找到破坏方法','了解实体弱点','确认行动代价']), cluesGenerated: true }
+    ]
   };
 }
 
+// Generate specific clues for an act based on story context so far
+async function generateActClues(act) {
+  if (act.cluesGenerated) return;
+  const recentNarration = state.history
+    .filter(m => m.role === 'assistant').slice(-4)
+    .map(m => { try { return safeParseJSON(m.content).narration; } catch { return m.content; } })
+    .join(' ');
+
+  try {
+    const data = await fetchWithRetry({
+      model: MODEL, max_tokens: 400,
+      system: '只返回纯JSON，不含markdown。',
+      messages: [{ role: 'user', content:
+        `克苏鲁跑团，背景：${state.outline.setting}，实体：${state.outline.entity}
+当前幕：「${act.title}」，目标：${act.goal}
+近期故事：${recentNarration || '调查刚刚开始'}
+为本幕生成3条具体线索，每条12字内，要与当前故事场景紧密结合。
+只返回JSON数组：["线索1","线索2","线索3"]`
+      }]
+    }, 1);
+    const raw = data.content[0].text;
+    const match = raw.match(/\[[\s\S]*?\]/);
+    if (match) {
+      const arr = JSON.parse(match[0].replace(/[\u201c\u201d]/g, '"'));
+      if (Array.isArray(arr) && arr.length >= 3) {
+        act.clues = arr.slice(0, 3).map(desc => ({ desc, revealed: false }));
+      }
+    }
+  } catch(e) { console.warn('generateActClues failed:', e.message); }
+  act.cluesGenerated = true;
+}
+
 // ── Script Agent: progress monitor ─────────────────────
-function checkAndAdvanceAct(narration) {
+function checkAndAdvanceAct(parsed) {
   if (!state.outline) return null;
   const act = state.outline.acts[state.currentAct - 1];
   if (!act) return null;
 
-  // Mark clues as shown if narration mentions them
-  act.clues.forEach(clue => {
-    if (!act.cluesShown.includes(clue) && narration.includes(clue.slice(0, 2))) {
-      act.cluesShown.push(clue);
-    }
+  // Generate clues for current act if not yet done
+  if (!act.cluesGenerated) {
+    generateActClues(act); // async, fire and forget — clues appear on next turn
+    return null;
+  }
+
+  // Mark clues as revealed based on Keeper's self-report
+  const reported = Array.isArray(parsed.cluesRevealed) ? parsed.cluesRevealed : [];
+  reported.forEach(idx => {
+    if (act.clues[idx]) act.clues[idx].revealed = true;
   });
 
-  const allShown = act.clues.every(c => act.cluesShown.includes(c));
+  const allRevealed = act.clues.every(c => c.revealed);
 
   // Final act complete → story ending
-  if (allShown && state.currentAct === state.outline.acts.length) {
+  if (allRevealed && state.currentAct === state.outline.acts.length) {
     return '__STORY_COMPLETE__';
   }
 
   // Advance to next act
-  if (allShown && state.currentAct < state.outline.acts.length) {
+  if (allRevealed && state.currentAct < state.outline.acts.length) {
     state.currentAct++;
     updateActIndicator();
     const newAct = state.outline.acts[state.currentAct - 1];
+    generateActClues(newAct); // pre-generate clues for the new act
     return `【剧本编写者提示主持人：推进至第${state.currentAct}幕「${newAct.title}」，目标：${newAct.goal}】`;
   }
 
-  // Nudge every 5 turns if clues remain
+  // Nudge every 5 turns
   const turns = state.history.filter(m => m.role === 'assistant').length;
-  const unshown = act.clues.filter(c => !act.cluesShown.includes(c));
-  if (turns > 0 && turns % 5 === 0 && unshown.length > 0) {
-    return `【剧本编写者提示主持人：适时引导玩家发现「${unshown[0]}」】`;
+  if (turns > 0 && turns % 5 === 0) {
+    const pending = act.clues.filter(c => !c.revealed);
+    if (pending.length > 0) {
+      return `【剧本编写者提示主持人：请在接下来的叙事中引导玩家发现「${pending[0].desc}」】`;
+    }
   }
   return null;
 }
@@ -1470,17 +1514,15 @@ function updateActIndicator() {
 }
 
 async function fetchWithRetry(body, maxRetries = 2) {
-  const geminiBody = {
-    systemInstruction: body.system ? { parts: [{ text: body.system }] } : undefined,
-    contents: (body.messages || []).map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }]
-    })),
-    generationConfig: {
-      maxOutputTokens: body.max_tokens || 1000,
-      temperature: 0.9,
-      thinkingConfig: { thinkingBudget: 0 }
-    }
+  // OpenRouter uses OpenAI-compatible format
+  const orBody = {
+    model: MODEL,
+    max_tokens: body.max_tokens || 1000,
+    temperature: 0.9,
+    messages: [
+      ...(body.system ? [{ role: 'system', content: body.system }] : []),
+      ...(body.messages || [])
+    ]
   };
 
   const keyCount = Math.max(getApiKeys().length, 1);
@@ -1490,8 +1532,13 @@ async function fetchWithRetry(body, maxRetries = 2) {
     try {
       const res = await fetch(getApiUrl(), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(geminiBody)
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getApiKey()}`,
+          'HTTP-Referer': window.location.href,
+          'X-Title': 'Abyss Whispers'
+        },
+        body: JSON.stringify(orBody)
       });
       if (res.status === 429) {
         const rotated = rotateApiKey();
@@ -1503,7 +1550,8 @@ async function fetchWithRetry(body, maxRetries = 2) {
         throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
       }
       const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      // Normalize to internal format: { content: [{ text }] }
+      const text = data.choices?.[0]?.message?.content || '';
       return { content: [{ text }] };
     } catch (e) {
       if (i === totalAttempts) throw e;
@@ -1515,9 +1563,12 @@ async function fetchWithRetry(body, maxRetries = 2) {
 // Ask AI to generate contextual words based on recent story
 // Local word banks — no API call needed, saves quota
 const WORD_BANK = {
-  fractured: [
-    '推开','检查','询问','靠近','后退','寻找','拾起','观察','呼喊','逃跑',
-    '躲避','触碰','记录','翻阅','倾听','追踪','破坏','隐藏','祈祷','等待',
+  action: [
+    '逃跑','呼救','破坏','点火','撬开','抢夺','推倒','砸碎','撤离','抵抗',
+    '躲避','反击','抓住','切断','封堵','引爆','撕毁','夺门','翻越','求援'
+  ],
+  horror: [
+    '推开','检查','询问','靠近','后退','寻找','拾起','观察','呼喊','触碰',
     '黑暗','低语','裂缝','阴影','气味','回声','颤抖','凝视','冰冷','腐朽',
     '封印','仪式','禁忌','古老','遗忘','深处','边缘','虚空','吞噬','扭曲'
   ],
@@ -1529,13 +1580,33 @@ const WORD_BANK = {
 };
 
 function getLocalWords(mode, count) {
-  const bank = [...WORD_BANK[mode] || WORD_BANK.fractured];
-  // Shuffle
-  for (let i = bank.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [bank[i], bank[j]] = [bank[j], bank[i]];
+  if (mode === 'lost') {
+    const bank = [...WORD_BANK.lost];
+    for (let i = bank.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [bank[i], bank[j]] = [bank[j], bank[i]];
+    }
+    return bank.slice(0, count);
   }
-  return bank.slice(0, count);
+  // Mix action and horror words based on sanity
+  const sanity = state.sanity;
+  const actionRatio = sanity > 60 ? 0.5 : sanity > 30 ? 0.25 : 0.1;
+  const actionCount = Math.round(count * actionRatio);
+  const horrorCount = count - actionCount;
+
+  const shuffle = arr => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+  const mixed = [
+    ...shuffle(WORD_BANK.action).slice(0, actionCount),
+    ...shuffle(WORD_BANK.horror).slice(0, horrorCount)
+  ];
+  return shuffle(mixed);
 }
 
 async function fetchAIWords(mode) {
@@ -1545,10 +1616,24 @@ async function fetchAIWords(mode) {
     .map(m => { try { return JSON.parse(m.content).narration; } catch { return ''; } })
     .join(' ');
 
+  const sanity = state.sanity;
   const count = mode === 'lost' ? 12 : 20;
-  const prompt = mode === 'lost'
-    ? `根据以下克苏鲁故事片段，生成${count}个极度破碎、混乱的中文词语或短语（1-4字），反映一个精神崩溃者的思维残片。可混入少量英文克苏鲁词汇。只返回JSON数组，格式：["词1","词2"]。故事：${recentNarration || '黑暗与虚空'}`
-    : `根据以下克苏鲁故事片段，生成${count}个适合调查员行动的中文词语或短语（1-5字），混合正常行动词和诡异恐惧相关的词。只返回JSON数组，格式：["词1","词2"]。故事：${recentNarration || '陌生的调查现场'}`;
+
+  let prompt;
+  if (mode === 'lost') {
+    prompt = `根据以下克苏鲁故事片段，生成${count}个极度破碎、混乱的中文词语（1-4字），反映精神崩溃者的思维残片。可混入少量英文克苏鲁词汇。只返回JSON数组：["词1","词2"]。故事：${recentNarration || '黑暗与虚空'}`;
+  } else {
+    const actionRatio = sanity > 60 ? 0.5 : sanity > 30 ? 0.25 : 0.1;
+    const actionCount = Math.round(count * actionRatio);
+    const horrorCount = count - actionCount;
+    prompt = `根据以下克苏鲁故事片段，生成供玩家选择的行动词云。
+当前调查员理智：${sanity}（越低则越难做出有效行动）
+要求生成两类词语，混合后打乱顺序返回：
+1. 【有效行动词】${actionCount}个：能帮助调查员脱困的具体动作或物品（如"撬开门""呼救""抢夺钥匙""引爆"），结合故事场景
+2. 【状态描述词】${horrorCount}个：描述恐惧、环境、感受的词（如"颤抖""黑暗""低语"），结合故事场景
+故事背景：${recentNarration || '陌生的调查现场'}
+只返回打乱后的JSON数组：["词1","词2"]，不要分类标注`;
+  }
 
   try {
     const data = await fetchWithRetry({
@@ -1556,7 +1641,7 @@ async function fetchAIWords(mode) {
       max_tokens: 300,
       system: '只返回纯JSON数组，不含任何说明文字或markdown。',
       messages: [{ role: 'user', content: prompt }]
-    }, 1); // only 1 retry to stay lightweight
+    }, 1);
 
     const raw = data.content?.[0]?.text || '';
     const match = raw.match(/\[[\s\S]*\]/);
@@ -1573,7 +1658,7 @@ async function fetchAIWords(mode) {
   } catch(e) {
     console.warn('fetchAIWords failed, using local fallback:', e.message);
   }
-  return getLocalWords(mode, count); // silent fallback
+  return getLocalWords(mode, count);
 }
 
 function getSanityMode(sanity) {
@@ -1658,7 +1743,29 @@ function safeParseJSON(raw) {
   // 5. Remove trailing commas
   out = out.replace(/,(\s*[}\]])/g, '$1');
 
-  return JSON.parse(out);
+  // 6. If JSON is truncated, try to auto-close unclosed brackets
+  try {
+    return JSON.parse(out);
+  } catch(e) {
+    const stack = [];
+    let inS = false;
+    for (let i = 0; i < out.length; i++) {
+      const c = out[i];
+      if (c === '\\') { i++; continue; }
+      if (c === '"') { inS = !inS; continue; }
+      if (!inS) {
+        if (c === '{') stack.push('}');
+        else if (c === '[') stack.push(']');
+        else if (c === '}' || c === ']') stack.pop();
+      }
+    }
+    // Close open string, strip trailing partial token, close all open brackets
+    let fixed = inS ? out + '"' : out;
+    fixed = fixed.replace(/,\s*"[^"]*$/, '').replace(/,\s*$/, '');
+    fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
+    while (stack.length) fixed += stack.pop();
+    return JSON.parse(fixed);
+  }
 }
 // ── Story Ending ────────────────────────────────────────
 async function triggerStoryEnding() {
@@ -1670,50 +1777,69 @@ async function triggerStoryEnding() {
   addSystemMessage('═══ 最终幕落下 ═══');
   setTyping(true);
 
-  const endings = state.outline?.endings || [];
-  const endingHint = endings.length > 0
-    ? (state.sanity > 50 ? endings[endings.length - 1]
-      : state.sanity > 20 ? endings[Math.floor(endings.length / 2)]
-      : endings[0])
-    : '调查员带着满身伤痕离开了这个地方';
+  const endings = state.outline?.endings || {};
+  const isSacrifice = state.sanity <= 30;
+  const endingType = isSacrifice ? 'sacrifice' : 'escape';
+  const endingHint = endings[endingType] || (isSacrifice ? '调查员以生命终结威胁' : '调查员破坏仪式，脱身而去');
+
+  const cluesFound = state.outline.acts.flatMap(a => a.clues.filter(c => c.revealed).map(c => c.desc));
 
   try {
     const data = await fetchWithRetry({
       model: MODEL,
-      max_tokens: 400,
-      system: '你是洛夫克拉夫特风格跑团的主持人。用第二人称"你"写作，约120字，有文学感。这是故事的终章，语气沉重、解脱或模糊皆可。直接输出叙事文字，不要JSON。',
+      max_tokens: 500,
+      system: `你是洛夫克拉夫特风格跑团的主持人。用第二人称"你"写作，150字以内，语言有文学感、具体、克制。
+结局类型：${isSacrifice ? '调查员牺牲——以自身为代价终结威胁，可以是死亡、永久疯狂、或被封印' : '调查员脱身——成功破坏仪式或逃离，但留下难以磨灭的创伤'}
+要求：
+- 结局必须呼应本局的核心实体、故事背景和已发现的线索
+- 有明确的终结感，不能含糊其辞或暗示"旅程继续"
+- 不要写成流水账，要有一个核心意象或画面
+- 直接输出叙事文字，不要JSON`,
       messages: [
-        ...state.history.slice(-6),
-        { role: 'user', content: `【故事结束，请写最终结局叙述】结局方向：${endingHint}。调查员当前理智：${state.sanity}/${state.maxSanity}。` }
+        ...state.history.slice(-8),
+        { role: 'user', content: `【故事结束】实体：${state.outline.entity}。背景：${state.outline.setting}。已发现线索：${cluesFound.join('、') || '寥寥无几'}。调查员理智：${state.sanity}/${state.maxSanity}。结局方向：${endingHint}。请写最终结局叙述。` }
       ]
     });
     const closingText = data.content[0].text.trim();
     setTyping(false);
-    addNarratorMsg(closingText.replace(/\*(.*?)\*/g, '<em>$1</em>'), false);
+    addNarratorMsg(closingText.replace(/\*(.*?)\*/g, '<em>$1</em>'), isSacrifice);
   } catch(e) {
     setTyping(false);
-    addNarratorMsg(`${endingHint}。故事到这里，落下了帷幕。`, false);
+    addNarratorMsg(endingHint + '。', isSacrifice);
   }
 
-  addSystemMessage('═══ 游戏结束：调查员完成了调查 ═══');
-  setTimeout(() => generateEndReport('通关'), 1500);
+  const outcomeLabel = isSacrifice ? '调查员以生命终结威胁' : '调查员破坏仪式，脱身而去';
+  addSystemMessage(`═══ 游戏结束：${outcomeLabel} ═══`);
+  setTimeout(() => generateEndReport(isSacrifice ? '牺牲' : '脱身'), 1500);
 }
 
 async function generateEndReport(outcome) {
   if (!state.outline) return;
 
   const turnsPlayed = Math.floor(state.history.length / 2);
-  const cluesFound = state.outline.acts.flatMap(a => a.cluesShown);
+  const cluesFound = state.outline.acts.flatMap(a =>
+    a.clues.filter(c => c.revealed).map(c => c.desc || c)
+  );
   const actsReached = state.currentAct;
   const date = new Date();
   const caseId = `MU-${date.getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}`;
 
   // Build narrative summary via AI
-  const recentHistory = state.history.slice(-10)
+  const fullHistory = state.history
     .map(m => {
       if (m.role === 'user') return `行动：${m.content}`;
-      try { return `叙事：${JSON.parse(m.content).narration}`; } catch { return ''; }
+      try { return `叙事：${JSON.parse(m.content).narration}`; } catch { return `叙事：${m.content}`; }
     }).join('\n');
+
+  // Get the closing narration (last assistant message)
+  const lastNarration = (() => {
+    for (let i = state.history.length - 1; i >= 0; i--) {
+      if (state.history[i].role === 'assistant') {
+        try { return JSON.parse(state.history[i].content).narration; } catch { return state.history[i].content; }
+      }
+    }
+    return '';
+  })();
 
   addSystemMessage('米斯卡托尼克大学异常事件档案室正在生成报告……');
 
@@ -1724,7 +1850,17 @@ async function generateEndReport(outcome) {
       system: '你是米斯卡托尼克大学异常事件档案室的书记员。用客观、克制、略带官僚气息的档案记录口吻写作，约120字，不用标题。',
       messages: [{
         role: 'user',
-        content: `根据以下调查记录，以官方档案的口吻写一段案件总结。调查员：${state.outline.investigatorName}。背景：${state.outline.setting}。结果：${outcome === '崩溃' ? '调查员精神崩溃，案件悬而未决' : '调查员成功脱身'}。已发现线索：${cluesFound.join('、') || '无'}。涉及实体：${state.outline.entity}。\n\n调查记录片段：\n${recentHistory}`
+        content: `根据以下调查记录，以官方档案口吻写一段案件总结（约120字，不用标题）。
+调查员：${state.outline.investigatorName}
+背景：${state.outline.setting}
+涉及实体：${state.outline.entity}
+已发现线索：${cluesFound.join('、') || '无'}
+结果：${outcome === '崩溃' ? '调查员精神崩溃，案件悬而未决' : outcome === '牺牲' ? '调查员以生命为代价终结威胁，案件以牺牲告终' : '调查员成功破坏仪式，脱身而去'}
+最终理智：${state.sanity}/${state.maxSanity}
+结局叙述：${lastNarration}
+
+完整调查记录：
+${fullHistory.slice(-3000)}`
       }]
     });
     narrative = data.content[0].text.trim();
@@ -2187,12 +2323,15 @@ async function callAI(playerInput) {
   setTyping(true);
 
   // Build outline context for Keeper
+  const currentAct = state.outline?.acts[state.currentAct - 1];
+  const pendingClues = currentAct?.clues.filter(c => !c.revealed) || [];
+
   const outlineCtx = state.outline ? `
 【剧本大纲（仅主持人可见）】
 调查员：${state.outline.investigatorName}
-当前幕：第${state.currentAct}幕「${state.outline.acts[state.currentAct-1]?.title}」
-本幕目标：${state.outline.acts[state.currentAct-1]?.goal}
-待揭示线索：${state.outline.acts[state.currentAct-1]?.clues.filter(c=>!state.outline.acts[state.currentAct-1].cluesShown.includes(c)).join('、') || '（本幕线索已全部揭示）'}
+当前幕：第${state.currentAct}幕「${currentAct?.title}」
+本幕目标：${currentAct?.goal}
+本幕待揭示线索：${pendingClues.length > 0 ? pendingClues.map((c,i) => `[${i}] ${c.desc}`).join('；') : '（本幕线索已全部揭示）'}
 核心实体：${state.outline.entity}
 隐藏秘密：${state.outline.secret}
 背景：${state.outline.setting}` : '';
@@ -2204,13 +2343,14 @@ ${outlineCtx}
 
 主持人规则：
 1. 用第二人称"你"叙述，100-200字，有文学感
-2. 自然地将待揭示线索编织进叙事，不要强行提及
+2. 主动将待揭示线索自然地编织进叙事，引导玩家发现
 3. 理智值低于40时，叙述更破碎、主观扭曲
 4. 玩家输入若是碎片词语（理智降低导致），合理诠释并推进剧情
 5. 若收到【剧本编写者提示】，按提示方向调整叙事
 6. narration中人物对话必须用「」书名号，严禁使用英文双引号"包裹对话
+7. 若本轮叙事中明确揭示了某条待揭示线索，在cluesRevealed中填入对应编号（如[0]或[0,1]），否则填空数组
 
-只返回JSON：{"narration":"...","sanityLoss":数字(0-15),"isHorror":布尔}`;
+只返回JSON：{"narration":"...","sanityLoss":数字(0-15),"isHorror":布尔,"cluesRevealed":[]}`;
 
   const messages = [
     ...state.history,
@@ -2235,9 +2375,8 @@ ${outlineCtx}
     }
 
     // Script Agent monitors progress and may inject a nudge
-    const scriptNote = checkAndAdvanceAct(parsed.narration);
+    const scriptNote = checkAndAdvanceAct(parsed);
 
-    // Story complete — trigger ending sequence
     if (scriptNote === '__STORY_COMPLETE__') {
       state.history.push({ role: 'user', content: playerInput });
       state.history.push({ role: 'assistant', content: JSON.stringify(parsed) });
